@@ -1,182 +1,390 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Northern Lights Reporter - Real-time Aurora Visibility</title>
-    <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Aurora Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+  <link rel="stylesheet" href="/src/css/styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🌌 Northern Lights Reporter</h1>
-            <p class="subtitle">Real-time Aurora Visibility</p>
-            <p class="location-info" id="location-info">
-                📍 Getting your location... 
-                <a href="#" id="location-request-btn" style="font-size: 0.85em; color: #4facfe; margin-left: 10px; text-decoration: none;">Allow Location</a>
-            </p>
-        </header>
-
-        <div class="main-card">
-            <div id="loading-state" class="loading">
-                <div class="spinner"></div>
-                <p>Fetching aurora forecast data...</p>
-            </div>
-
-            <div id="content-state" style="display: none;">
-                <div class="status-bar">
-                    <div class="status-indicator"></div>
-                    <span class="status-text">Live data from NOAA Space Weather Prediction Center</span>
-                </div>
-
-                <div class="aurora-indicator">
-                    <div id="indicator-circle" class="indicator-circle chance-very-low">
-                        <span id="chance-emoji">❌</span>
-                    </div>
-                    <div class="indicator-text">
-                        <h2 id="chance-title">Very Low Chance</h2>
-                        <div class="visibility-percentage">
-                            <span id="visibility-percent">0</span>%
-                        </div>
-                        <p id="chance-description">
-                            Check back later for better visibility conditions.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-label">Solar Wind Speed</div>
-                        <div class="metric-value">
-                            <span id="solar-wind">--</span><span class="metric-unit">km/s</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">G4 Storm Similarity</div>
-                        <div class="metric-value" id="kp-value">--</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Magnetic Field (Bz)</div>
-                        <div class="metric-value">
-                            <span id="bz-value">--</span><span class="metric-unit">nT</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Activity Level</div>
-                        <div class="metric-value" id="activity-level">--</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Density</div>
-                        <div class="metric-value">
-                            <span id="density-value">--</span><span class="metric-unit">p/cm³</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Total Field (Bt)</div>
-                        <div class="metric-value">
-                            <span id="bt-value">--</span><span class="metric-unit">nT</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Temperature</div>
-                        <div class="metric-value">
-                            <span id="temp-value">--</span><span class="metric-unit">K</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Latitude</div>
-                        <div class="metric-value">
-                            <span id="visibility-lat">--</span>°N
-                        </div>
-                    </div>
-                </div>
-
-                <div class="cloud-section">
-                    <h3>☁️ Cloud Coverage (GO/NO-GO Decision)</h3>
-                    <div class="cloud-container">
-                        <div class="cloud-indicator">
-                            <div id="cloud-visibility" class="cloud-vis-bar">
-                                <div id="cloud-clear-portion" class="cloud-clear" style="width: 0%"></div>
-                            </div>
-                            <div class="cloud-stats">
-                                <div class="cloud-stat">
-                                    <span class="cloud-label">🔵 Low Clouds:</span>
-                                    <span id="cloud-low">--</span>%
-                                </div>
-                                <div class="cloud-stat">
-                                    <span class="cloud-label">🟢 Mid Clouds:</span>
-                                    <span id="cloud-mid">--</span>%
-                                </div>
-                                <div class="cloud-stat">
-                                    <span class="cloud-label">⚪ High Clouds:</span>
-                                    <span id="cloud-high">--</span>%
-                                </div>
-                            </div>
-                        </div>
-                        <div class="cloud-decision" id="cloud-decision-box">
-                            <div class="decision-icon" id="decision-icon">?</div>
-                            <div class="decision-text" id="decision-text">Loading cloud data...</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="baseline-section">
-                    <h3>📊 G4 Baseline (May 2024 Severe Storm)</h3>
-                    <div class="baseline-grid">
-                        <div class="baseline-card">
-                            <div class="baseline-label">Speed</div>
-                            <div class="baseline-value">600 km/s</div>
-                        </div>
-                        <div class="baseline-card">
-                            <div class="baseline-label">Similarity</div>
-                            <div class="baseline-value">100%</div>
-                        </div>
-                        <div class="baseline-card">
-                            <div class="baseline-label">Bz</div>
-                            <div class="baseline-value">-25 nT</div>
-                        </div>
-                        <div class="baseline-card">
-                            <div class="baseline-label">Bt</div>
-                            <div class="baseline-value">30 nT</div>
-                        </div>
-                        <div class="baseline-card">
-                            <div class="baseline-label">Density</div>
-                            <div class="baseline-value">20 p/cm³</div>
-                        </div>
-                        <div class="baseline-card">
-                            <div class="baseline-label">Temperature</div>
-                            <div class="baseline-value">2.0M K</div>
-                        </div>
-                    </div>
-                    <p class="baseline-note">↑ The gap between current values and baseline shows how close we are to G4 conditions</p>
-                </div>
-
-                <div class="recommendations" id="recommendations">
-                    <h3>📋 Recommendations</h3>
-                    <ul id="recommendations-list"></ul>
-                </div>
-
-                <div class="forecast-section">
-                    <h2 class="forecast-title">Real-Time Space Weather Info</h2>
-                    <div class="hourly-forecast" id="hourly-forecast"></div>
-                </div>
-
-                <div class="last-updated">
-                    Last updated: <span id="last-updated">--</span>
-                    <p class="location-info">Seattle, WA • Latitude: 47.6°N • Longitude: -122.3°W</p>
-                </div>
-            </div>
-
-            <div id="error-state" style="display: none;">
-                <div class="error">
-                    <strong>Unable to fetch aurora data</strong>
-                    <p id="error-message"></p>
-                    <p style="margin-top: 10px; font-size: 0.9em;">Please check your internet connection and try refreshing the page.</p>
-                </div>
-            </div>
-        </div>
+  <div class="app">
+    
+    <!-- Loading State -->
+    <div id="loading-state" class="state-container">
+      <div class="spinner"></div>
+      <p>Analyzing space weather...</p>
     </div>
 
-    <script src="js/aurora-tracker.js"></script>
+    <!-- Error State = NO GO -->
+    <div id="error-state" class="state-container" style="display:none">
+      <div class="decision-card no-go">
+        <div class="decision-icon">🚫</div>
+        <div class="decision-text">NO GO</div>
+        <div class="decision-reason">Unable to fetch data</div>
+      </div>
+      <p class="error-detail" id="error-message">Check your connection</p>
+      <button class="retry-btn" id="retry-btn">Retry</button>
+    </div>
+
+    <!-- Main Content -->
+    <main id="content-state" style="display:none">
+      
+      <!-- Header -->
+      <header>
+        <div>
+          <h1>🌌 Aurora Tracker</h1>
+          <p id="location-info">📍 Loading location...</p>
+        </div>
+        <div class="live-indicator">
+          <span class="live-dot"></span>
+          <span id="last-updated">--</span>
+        </div>
+      </header>
+
+      <!-- Desktop Layout Container -->
+      <div class="main-grid">
+        
+        <!-- LEFT COLUMN - Decision & Key Factors -->
+        <div class="left-column">
+          
+          <!-- #1 THE DECISION - Big & Bold -->
+          <section id="decision-card" class="decision-card">
+            <div class="decision-icon" id="decision-icon">⏳</div>
+            <div class="decision-text" id="decision-text">CHECKING</div>
+            <div class="decision-reason" id="decision-reason">Analyzing conditions...</div>
+          </section>
+
+          <!-- #2 G4 SIMILARITY -->
+          <section class="similarity-section">
+            <div class="similarity-header">
+              <span>🌟 G4 Storm Match</span>
+              <span class="similarity-badge" id="similarity-badge">--%</span>
+            </div>
+            <div class="similarity-bar">
+              <div class="similarity-fill" id="similarity-bar"></div>
+              <div class="similarity-markers">
+                <span class="marker" style="left:25%">25%</span>
+                <span class="marker" style="left:50%">50%</span>
+                <span class="marker" style="left:75%">75%</span>
+              </div>
+            </div>
+            <p class="similarity-desc">vs <strong>May 10-11, 2024</strong> G4 storm</p>
+          </section>
+
+          <!-- #3 TWO KEY FACTORS -->
+          <section class="factors">
+            <div class="factor">
+              <div class="factor-header">
+                <span class="factor-label">🌌 Aurora</span>
+                <span class="factor-value" id="aurora-value">--%</span>
+              </div>
+              <div class="factor-bar">
+                <div class="factor-fill" id="aurora-bar"></div>
+              </div>
+              <div class="factor-hint" id="aurora-hint">--</div>
+            </div>
+            
+            <div class="factor">
+              <div class="factor-header">
+                <span class="factor-label">☁️ Sky</span>
+                <span class="factor-value" id="sky-value">--%</span>
+              </div>
+              <div class="factor-bar">
+                <div class="factor-fill" id="sky-bar"></div>
+              </div>
+              <div class="factor-hint" id="sky-hint">--</div>
+            </div>
+          </section>
+
+          <!-- #4 RECOMMENDATION -->
+          <section class="action-box" id="action-box">
+            <div class="action-title">💡 Recommendation</div>
+            <p class="action-text" id="action-text">Waiting for data...</p>
+          </section>
+
+          <!-- Cloud Coverage (Compact) -->
+          <section class="clouds-section">
+            <div class="clouds-header">
+              <h3>☁️ Cloud Cover</h3>
+              <span class="cloud-total-inline" id="cloud-total">--%</span>
+              <span class="cloud-trend" id="cloud-trend">--</span>
+            </div>
+            <div class="cloud-layers-compact">
+              <div class="cloud-layer-compact">
+                <span class="cloud-label">Low</span>
+                <div class="cloud-bar"><div class="cloud-fill low" id="cloud-low-bar"></div></div>
+                <span class="cloud-val" id="cloud-low">--%</span>
+              </div>
+              <div class="cloud-layer-compact">
+                <span class="cloud-label">Mid</span>
+                <div class="cloud-bar"><div class="cloud-fill mid" id="cloud-mid-bar"></div></div>
+                <span class="cloud-val" id="cloud-mid">--%</span>
+              </div>
+              <div class="cloud-layer-compact">
+                <span class="cloud-label">High</span>
+                <div class="cloud-bar"><div class="cloud-fill high" id="cloud-high-bar"></div></div>
+                <span class="cloud-val" id="cloud-high">--%</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- RIGHT COLUMN - All the Data -->
+        <div class="right-column">
+          
+          <!-- NOAA Storm Scale - Current Observed -->
+          <section class="storm-section">
+            <div class="storm-section-header">
+              <span class="storm-label">⚡ Current Observed</span>
+              <span class="storm-time" id="g-observed-time">--</span>
+            </div>
+            <div class="storm-scale">
+              <div class="storm-level" id="g0"><span>G0</span></div>
+              <div class="storm-level" id="g1"><span>G1</span></div>
+              <div class="storm-level" id="g2"><span>G2</span></div>
+              <div class="storm-level" id="g3"><span>G3</span></div>
+              <div class="storm-level" id="g4"><span>G4</span></div>
+              <div class="storm-level" id="g5"><span>G5</span></div>
+            </div>
+            <p class="storm-current" id="g-scale-text">G0 - No Storm</p>
+          </section>
+
+          <!-- NOAA Storm Scale - Predicted -->
+          <section class="storm-section storm-predicted">
+            <div class="storm-section-header">
+              <span class="storm-label">🔮 Predicted (24h)</span>
+              <span class="storm-time" id="g-predicted-time">--</span>
+            </div>
+            <div class="storm-scale">
+              <div class="storm-level" id="gp0"><span>G0</span></div>
+              <div class="storm-level" id="gp1"><span>G1</span></div>
+              <div class="storm-level" id="gp2"><span>G2</span></div>
+              <div class="storm-level" id="gp3"><span>G3</span></div>
+              <div class="storm-level" id="gp4"><span>G4</span></div>
+              <div class="storm-level" id="gp5"><span>G5</span></div>
+            </div>
+            <p class="storm-current" id="g-predicted-text">G0 - No Storm</p>
+          </section>
+
+
+          <!-- PRIMARY METRICS -->
+          <section class="metrics-section">
+            <h2>📊 Space Weather Data</h2>
+            
+            <div class="metrics-grid">
+              
+              <!-- Bz Field - THE Key Metric -->
+              <div class="metric-card primary" data-tooltip="THE most important factor! Negative Bz (southward IMF) opens Earth's magnetosphere to solar wind. Without southward Bz, no aurora is possible regardless of other factors. More negative = stronger aurora.">
+                <div class="metric-header">
+                  <span class="metric-icon">⚡</span>
+                  <span class="metric-name">Bz Field</span>
+                  <span class="metric-badge">KEY</span>
+                </div>
+                <div class="metric-values">
+                  <div class="metric-current">
+                    <span class="val" id="bz-current">--</span>
+                    <span class="unit">nT</span>
+                  </div>
+                  <div class="metric-vs">vs</div>
+                  <div class="metric-baseline">
+                    <span class="val" id="bz-baseline">-30</span>
+                    <span class="unit">nT</span>
+                  </div>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" id="bz-bar"></div></div>
+                <div class="metric-status" id="bz-status">--</div>
+              </div>
+
+              <!-- Solar Wind Speed -->
+              <div class="metric-card" data-tooltip="Speed of solar wind particles. Normal is ~400 km/s. CMEs can push this above 700 km/s. Faster wind = more energy hitting magnetosphere.">
+                <div class="metric-header">
+                  <span class="metric-icon">💨</span>
+                  <span class="metric-name">Solar Wind</span>
+                </div>
+                <div class="metric-values">
+                  <div class="metric-current">
+                    <span class="val" id="speed-current">--</span>
+                    <span class="unit">km/s</span>
+                  </div>
+                  <div class="metric-vs">vs</div>
+                  <div class="metric-baseline">
+                    <span class="val" id="speed-baseline">750</span>
+                    <span class="unit">km/s</span>
+                  </div>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" id="speed-bar"></div></div>
+                <div class="metric-status" id="speed-status">--</div>
+              </div>
+
+              <!-- Dynamic Pressure -->
+              <div class="metric-card" data-tooltip="How hard solar wind pushes against Earth's magnetic field. Calculated from density × speed². High pressure compresses magnetosphere and drives auroral activity.">
+                <div class="metric-header">
+                  <span class="metric-icon">💥</span>
+                  <span class="metric-name">Pressure</span>
+                </div>
+                <div class="metric-values">
+                  <div class="metric-current">
+                    <span class="val" id="pressure-current">--</span>
+                    <span class="unit">nPa</span>
+                  </div>
+                  <div class="metric-vs">vs</div>
+                  <div class="metric-baseline">
+                    <span class="val" id="pressure-baseline">15</span>
+                    <span class="unit">nPa</span>
+                  </div>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" id="pressure-bar"></div></div>
+                <div class="metric-status" id="pressure-status">--</div>
+              </div>
+
+              <!-- Particle Density -->
+              <div class="metric-card" data-tooltip="Particle count per cubic centimeter. More particles = brighter aurora display. Density can spike when CME shock waves arrive.">
+                <div class="metric-header">
+                  <span class="metric-icon">🌊</span>
+                  <span class="metric-name">Density</span>
+                </div>
+                <div class="metric-values">
+                  <div class="metric-current">
+                    <span class="val" id="density-current">--</span>
+                    <span class="unit">p/cm³</span>
+                  </div>
+                  <div class="metric-vs">vs</div>
+                  <div class="metric-baseline">
+                    <span class="val" id="density-baseline">25</span>
+                    <span class="unit">p/cm³</span>
+                  </div>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" id="density-bar"></div></div>
+                <div class="metric-status" id="density-status">--</div>
+              </div>
+
+              <!-- Bt Total Field -->
+              <div class="metric-card" data-tooltip="Total interplanetary magnetic field strength. Typical is ~5–10 nT; 40 nT is an extreme G4-level reference. High Bt + negative Bz = strongest aurora.">
+                <div class="metric-header">
+                  <span class="metric-icon">🧲</span>
+                  <span class="metric-name">Bt Field</span>
+                </div>
+                <div class="metric-values">
+                  <div class="metric-current">
+                    <span class="val" id="bt-current">--</span>
+                    <span class="unit">nT</span>
+                  </div>
+                  <div class="metric-vs">vs</div>
+                  <div class="metric-baseline">
+                    <span class="val" id="bt-baseline">40</span>
+                    <span class="unit">nT</span>
+                  </div>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" id="bt-bar"></div></div>
+                <div class="metric-status" id="bt-status">--</div>
+              </div>
+
+              <!-- Clock Angle -->
+              <div class="metric-card clock-card" data-tooltip="IMF clock angle - direction of magnetic field. 180° = pure southward (best). 0°/360° = northward (bad). Between 120°-240° is favorable.">
+                <div class="metric-header">
+                  <span class="metric-icon">🧭</span>
+                  <span class="metric-name">Clock Angle</span>
+                </div>
+                <div class="metric-clock">
+                  <div class="clock-face">
+                    <div class="clock-marker north">N</div>
+                    <div class="clock-marker south">S</div>
+                    <div class="clock-arrow" id="clock-arrow"></div>
+                  </div>
+                  <div class="clock-value">
+                    <span class="val" id="clock-current">--</span>
+                    <span class="unit">°</span>
+                  </div>
+                </div>
+                <div class="metric-status" id="clock-status">--</div>
+              </div>
+
+              <!-- Bz Duration -->
+              <div class="metric-card" data-tooltip="How long Bz has been southward in the last 30 minutes. Sustained southward Bz (15+ min) is more effective than brief spikes.">
+                <div class="metric-header">
+                  <span class="metric-icon">⏱️</span>
+                  <span class="metric-name">Bz Duration</span>
+                </div>
+                <div class="metric-values">
+                  <div class="metric-current">
+                    <span class="val" id="duration-current">--</span>
+                    <span class="unit">min</span>
+                  </div>
+                  <div class="metric-vs">of 30</div>
+                  <div class="metric-baseline">
+                    <span class="val">min</span>
+                    <span class="unit">south</span>
+                  </div>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" id="duration-bar"></div></div>
+                <div class="metric-status" id="duration-status">--</div>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- Viewing Info -->
+          <section class="info-section">
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Your Location</span>
+                <span class="info-value" id="user-latitude">--°</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Visible At</span>
+                <span class="info-value" id="visible-latitude">--°N+</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Best Time</span>
+                <span class="info-value">10PM-2AM</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Data Age</span>
+                <span class="info-value" id="data-time">--</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- NOAA OVATION Aurora Forecast -->
+          <section class="ovation-section">
+            <div class="ovation-header">
+              <span class="ovation-icon">🛰️</span>
+              <span class="ovation-title">NOAA Aurora Forecast</span>
+            </div>
+            <div class="ovation-content">
+              <div class="ovation-prob">
+                <span class="ovation-label">At Your Location</span>
+                <span class="ovation-value" id="ovation-local">--%</span>
+              </div>
+              <div class="ovation-prob">
+                <span class="ovation-label">Visible North ℹ️</span>
+                <span class="ovation-value" id="ovation-north">--%</span>
+              </div>
+            </div>
+            <p class="ovation-note" id="ovation-time">30-90 min forecast</p>
+            <div class="ovation-explanation">
+              <p class="ovation-tip"><strong>At Your Location:</strong> Aurora probability directly overhead at your coordinates.</p>
+              <p class="ovation-tip"><strong>Visible North:</strong> Maximum aurora intensity visible on your northern horizon (looking toward the pole). This shows the strongest auroral activity within view — even if the oval doesn't reach your exact location, you may still see glows on the horizon. Higher % = better chance of visible aurora looking north.</p>
+            </div>
+          </section>
+
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <footer>
+        <p>Data: <a href="https://www.swpc.noaa.gov/" target="_blank">NOAA SWPC</a> (DSCOVR/ACE + OVATION) • <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a></p>
+        <p>Baseline: May 10-11, 2024 G4 Storm</p>
+      </footer>
+
+    </main>
+  </div>
+
+  <script src="/src/js/aurora-tracker.js"></script>
 </body>
 </html>

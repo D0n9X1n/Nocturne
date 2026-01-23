@@ -1,17 +1,67 @@
 #!/bin/bash
 
-# 🚀 QUICK START - Northern Lights Reporter on Azure
+# 🚀 QUICK START - Aurora Tracker on Azure
 # Just run this file!
+
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+
+# Run a command and surface full error output on failure.
+run_cmd() {
+    local desc="$1"
+    shift
+    local output
+    output=$("$@" 2>&1)
+    local status=$?
+    if [ $status -ne 0 ]; then
+        echo "❌ ${desc} failed (exit ${status})"
+        echo "Error details:"
+        echo "$output"
+        return $status
+    fi
+    return 0
+}
+
+# Load .env file if exists
+if [ -f ".env" ]; then
+    echo "📂 Found .env file, loading configuration..."
+    set -a
+    source .env
+    set +a
+else
+    echo "⚠️  No .env file found. Using defaults or Azure settings."
+    echo "   Create .env from .env.example for email notifications"
+fi
+
+# Configuration (from .env or defaults)
+RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-aurora-tracker-rg}"
+APP_NAME="${AZURE_APP_NAME:-aurora-tracker}"
+PLAN_NAME="${AZURE_APP_PLAN:-${APP_NAME}-plan}"
+LOCATION="${AZURE_LOCATION:-}"
+
+# Location preference: try preferred first, then US-first defaults
+DEFAULT_LOCATIONS=(eastus westus2 centralus eastus2 northcentralus canadacentral westeurope)
+if [ -z "$LOCATION" ]; then
+    LOCATION_CANDIDATES=("${DEFAULT_LOCATIONS[@]}")
+    LOCATION_LABEL="auto (US-first)"
+else
+    LOCATION_CANDIDATES=("$LOCATION")
+    for LOC in "${DEFAULT_LOCATIONS[@]}"; do
+        if [ "$LOC" != "$LOCATION" ]; then
+            LOCATION_CANDIDATES+=("$LOC")
+        fi
+    done
+    LOCATION_LABEL="$LOCATION (preferred)"
+fi
 
 cat << 'EOF'
 
 ████████████████████████████████████████████████████████████
 █                                                          █
-█     🌌 Northern Lights Reporter - Azure Deploy 🌌     █
+█          🌌 Aurora Tracker - Azure Deploy 🌌          █
 █                                                          █
 ████████████████████████████████████████████████████████████
 
-🚀 Deploying Northern Lights Reporter to Azure...
+🚀 Deploying Aurora Tracker to Azure...
 
 EOF
 
@@ -35,19 +85,12 @@ echo ""
 echo "🚀 Starting deployment..."
 echo ""
 
-cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
-
-# Configuration
-RESOURCE_GROUP="northern-lights-reporter-rg"
-APP_NAME="northern-lights-reporter"
-PLAN_NAME="${APP_NAME}-plan"
-LOCATION="canadacentral"
 SKU=""
 
 echo "📦 Deployment Configuration:"
 echo "  Resource Group: $RESOURCE_GROUP"
 echo "  App Name:       $APP_NAME"
-echo "  Location:       $LOCATION"
+echo "  Location:       $LOCATION_LABEL"
 echo "  Plan Name:      $PLAN_NAME"
 echo "  SKU:            Prefer F1 (Free), fallback B1"
 echo ""
@@ -71,12 +114,27 @@ echo ""
 echo "1️⃣  Creating resource group..."
 if az group exists --name "$RESOURCE_GROUP" 2>/dev/null | grep -q true; then
     echo "✅ Resource group already exists"
+    if [ -z "$LOCATION" ]; then
+        LOCATION=$(az group show --name "$RESOURCE_GROUP" --query location -o tsv 2>/dev/null)
+        if [ -n "$LOCATION" ]; then
+            LOCATION_LABEL="${LOCATION} (existing RG)"
+        fi
+    fi
 else
-    if ! az group create --name "$RESOURCE_GROUP" --location "$LOCATION" > /dev/null 2>&1; then
-        echo "❌ Failed to create resource group"
+    CREATED=0
+    for TRY_LOCATION in "${LOCATION_CANDIDATES[@]}"; do
+        if run_cmd "Create resource group in ${TRY_LOCATION}" az group create --name "$RESOURCE_GROUP" --location "$TRY_LOCATION"; then
+            LOCATION="$TRY_LOCATION"
+            CREATED=1
+            echo "✅ Resource group created (${LOCATION})"
+            break
+        fi
+        echo "⚠️  Location $TRY_LOCATION unavailable, trying next..."
+    done
+    if [ $CREATED -ne 1 ]; then
+        echo "❌ Failed to create resource group in preferred locations"
         exit 1
     fi
-    echo "✅ Resource group created"
 fi
 echo ""
 
@@ -86,20 +144,24 @@ if az appservice plan show --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP
     echo "✅ App Service Plan already exists (SKU: ${SKU:-unknown})"
 else
     set +e
-    for TRY_SKU in F1 B1; do
-        az appservice plan create \
-            --name "$PLAN_NAME" \
-            --resource-group "$RESOURCE_GROUP" \
-            --location "$LOCATION" \
-            --sku "$TRY_SKU" \
-            --is-linux > /dev/null 2>&1
-        RESULT=$?
-        if [ $RESULT -eq 0 ]; then
-            SKU="$TRY_SKU"
-            echo "✅ App Service Plan created (SKU: $SKU)"
-            break
-        fi
-        echo "⚠️  SKU $TRY_SKU unavailable, trying next..."
+    for TRY_LOCATION in "${LOCATION_CANDIDATES[@]}"; do
+        for TRY_SKU in F1 B1; do
+            run_cmd "Create App Service Plan (SKU: ${TRY_SKU}, Location: ${TRY_LOCATION})" az appservice plan create \
+                --name "$PLAN_NAME" \
+                --resource-group "$RESOURCE_GROUP" \
+                --location "$TRY_LOCATION" \
+                --sku "$TRY_SKU" \
+                --is-linux
+            RESULT=$?
+            if [ $RESULT -eq 0 ]; then
+                SKU="$TRY_SKU"
+                LOCATION="$TRY_LOCATION"
+                echo "✅ App Service Plan created (SKU: $SKU)"
+                break 2
+            fi
+            echo "⚠️  SKU $TRY_SKU unavailable in $TRY_LOCATION, trying next..."
+        done
+        echo "⚠️  Location $TRY_LOCATION unavailable for plan, trying next..."
     done
     set -e
     if [ -z "$SKU" ]; then
@@ -135,7 +197,7 @@ APP_STATE=$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME"
 echo "   Current state: ${APP_STATE:-unknown}"
 if [ "$APP_STATE" = "QuotaExceeded" ] && [ "$SKU" = "F1" ]; then
     echo "⚠️  Free tier quota exceeded. Upgrading plan to B1..."
-    if ! az appservice plan update --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" --sku B1 > /dev/null 2>&1; then
+    if ! run_cmd "Upgrade plan to B1" az appservice plan update --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" --sku B1; then
         echo "❌ Failed to upgrade plan to B1"
         exit 1
     fi
@@ -145,17 +207,17 @@ fi
 echo ""
 
 echo "5️⃣  Configuring Node.js settings..."
-if ! az webapp config set \
+if ! run_cmd "Set Node.js runtime" az webapp config set \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
-    --linux-fx-version "NODE|22-lts" > /dev/null 2>&1; then
+    --linux-fx-version "NODE|22-lts"; then
     echo "❌ Failed to set Node.js runtime"
     exit 1
 fi
-if ! az webapp config appsettings set \
+if ! run_cmd "Configure app settings" az webapp config appsettings set \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
-    --settings NODE_ENV=production PORT=8080 SCM_DO_BUILD_DURING_DEPLOYMENT=true > /dev/null 2>&1; then
+    --settings NODE_ENV=production PORT=8080 SCM_DO_BUILD_DURING_DEPLOYMENT=true; then
     echo "❌ Failed to configure app settings"
     exit 1
 fi
@@ -170,7 +232,7 @@ echo ""
 echo "7️⃣  Preparing and deploying code..."
 echo "   Creating zip package (excluding .git, node_modules, .env)"
 TEMP_ZIP="/tmp/northern-lights-${APP_NAME}.zip"
-if ! zip -r "$TEMP_ZIP" . -x ".git/*" "node_modules/*" ".env" > /dev/null 2>&1; then
+if ! run_cmd "Create deployment package" zip -r "$TEMP_ZIP" . -x ".git/*" "node_modules/*" ".env"; then
     echo "❌ Failed to create deployment package"
     exit 1
 fi
@@ -190,7 +252,7 @@ for ATTEMPT in 1 2 3; do
     APP_STATE=$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --query state -o tsv 2>/dev/null)
     if [ "$APP_STATE" = "QuotaExceeded" ] && [ "$SKU" = "F1" ]; then
         echo "   ⚠️  Free tier quota exceeded. Upgrading plan to B1..."
-        if ! az appservice plan update --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" --sku B1 > /dev/null 2>&1; then
+        if ! run_cmd "Upgrade plan to B1" az appservice plan update --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP" --sku B1; then
             echo "   ❌ Failed to upgrade plan to B1"
             break
         fi
@@ -243,11 +305,43 @@ echo "  Azure Portal: https://portal.azure.com"
 echo "  Resource Group: $RESOURCE_GROUP"
 echo "  App Name: $APP_NAME"
 echo ""
+
+# Upload environment settings if .env exists and email is configured
+if [ -f ".env" ]; then
+    if [ "$EMAIL_ENABLED" = "true" ] && [ -n "$SMTP_USER" ] && [ -n "$SMTP_PASS" ]; then
+        echo "📧 Uploading email settings to Azure..."
+        run_cmd "Upload email settings" az webapp config appsettings set \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$APP_NAME" \
+            --settings \
+                EMAIL_ENABLED="${EMAIL_ENABLED:-false}" \
+                SMTP_HOST="${SMTP_HOST:-smtp.gmail.com}" \
+                SMTP_PORT="${SMTP_PORT:-587}" \
+                SMTP_USER="$SMTP_USER" \
+                SMTP_PASS="$SMTP_PASS" \
+                FROM_EMAIL="${FROM_EMAIL:-$SMTP_USER}" \
+                EMAIL_RECIPIENTS="${EMAIL_RECIPIENTS:-}" \
+                EMAIL_COOLDOWN="${EMAIL_COOLDOWN:-60}"
+        if [ $? -eq 0 ]; then
+            echo "✅ Email settings uploaded!"
+        else
+            echo "⚠️  Failed to upload email settings (you can do it manually in Azure Portal)"
+        fi
+        echo ""
+    else
+        echo "ℹ️  Email not configured in .env (EMAIL_ENABLED=false or missing credentials)"
+        echo "   Edit .env to enable email notifications"
+        echo ""
+    fi
+fi
+
 echo "📝 Useful Commands:"
 echo "  View logs:     az webapp log tail --resource-group $RESOURCE_GROUP --name $APP_NAME"
 echo "  Stop app:      az webapp stop --resource-group $RESOURCE_GROUP --name $APP_NAME"
 echo "  Delete all:    az group delete --name $RESOURCE_GROUP"
 echo "  Restart app:   az webapp restart --resource-group $RESOURCE_GROUP --name $APP_NAME"
+echo ""
+echo "  Upload env:    Run this script again (reads from .env)"
 echo ""
 
 exit 0
