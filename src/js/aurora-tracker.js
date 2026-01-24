@@ -322,6 +322,10 @@ class AuroraTracker {
     // Dynamic pressure (compression of magnetosphere)
     const pressureHigh = pressure > 3;// Significant compression
     
+    // Particle density (brighter aurora)
+    const densityHigh = density > 10; // High density = brighter aurora
+    const densityVeryHigh = density > 20; // Very high density
+    
     // Duration matters - sustained Bz is better than spikes
     const sustained = bzDuration >= 15; // 15+ minutes sustained southward
     
@@ -437,8 +441,16 @@ class AuroraTracker {
     // Pressure
     if (pressureHigh) { goScore += 6; reasons.push(`${pressure.toFixed(1)} nPa`); }
     
+    // Density (more particles = brighter aurora)
+    if (densityVeryHigh) { goScore += 8; reasons.push(`${density.toFixed(0)} p/cm³`); }
+    else if (densityHigh) { goScore += 4; }
+    
     // Clock angle
     if (goodClockAngle) { goScore += 4; }
+    
+    // Overall similarity to G4 storm (supporting evidence)
+    if (similarity >= 50) { goScore += 8; }
+    else if (similarity >= 30) { goScore += 4; }
     
     // Latitude margin bonus (aurora extends well past your location)
     if (latitudeMargin > 10) { goScore += 10; reasons.push(`${latitudeMargin.toFixed(0)}° margin`); }

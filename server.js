@@ -361,7 +361,6 @@ async function generateDailySummary() {
     yesterdayPST.setDate(yesterdayPST.getDate() - 1);
     
     const yesterdayStart = new Date(yesterdayPST.setHours(0, 0, 0, 0)).toISOString().slice(0, 10);
-    const yesterdayEnd = new Date(yesterdayPST.setHours(23, 59, 59, 999)).toISOString().slice(0, 10);
     
     // Filter data for yesterday (skip header row)
     const plasmaData = plasma.slice(1).filter(p => p[0] && p[0].startsWith(yesterdayStart));
