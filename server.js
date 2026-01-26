@@ -539,20 +539,28 @@ async function sendDailySummaryEmail() {
 
 // Schedule daily summary at 8 AM PST
 function scheduleDailySummary() {
+  let lastSentDate = null; // Track last sent date to prevent duplicates
+  
   const checkAndSchedule = () => {
     const now = new Date();
     // Convert to PST (UTC-8)
     const pstHours = (now.getUTCHours() - 8 + 24) % 24;
     const pstMinutes = now.getUTCMinutes();
+    const todayDate = now.toISOString().slice(0, 10);
     
-    // Check if it's 8:00 AM PST (within the first minute)
-    if (pstHours === 8 && pstMinutes === 0) {
+    // Check if it's 8:00-8:04 AM PST and haven't sent today
+    // Using 5-minute window to avoid race conditions
+    if (pstHours === 8 && pstMinutes < 5 && lastSentDate !== todayDate) {
+      lastSentDate = todayDate;
+      console.log(`[Daily] Triggering daily summary at ${pstHours}:${pstMinutes.toString().padStart(2, '0')} PST`);
       sendDailySummaryEmail();
     }
   };
   
   // Check every minute
   setInterval(checkAndSchedule, 60 * 1000);
+  // Also check immediately on startup (in case server just started at 8 AM)
+  checkAndSchedule();
   console.log('📅 Daily summary scheduled for 8:00 AM PST');
 }
 
@@ -707,6 +715,20 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: error.message }));
     }
+    return;
+  }
+
+  // API: Test daily summary email (manual trigger)
+  if (url.pathname === '/api/test-daily-email') {
+    if (!EMAIL_CONFIG.enabled) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Email not enabled', config: { enabled: false } }));
+      return;
+    }
+    console.log('[Test] Manual daily summary email trigger');
+    sendDailySummaryEmail();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, message: 'Daily summary email triggered' }));
     return;
   }
 
