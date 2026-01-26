@@ -472,62 +472,152 @@ async function sendDailySummaryEmail() {
   
   const { stats, goodBzHours, peakSimilarity, peakTime, verdict, emoji, description } = summary;
   
+  // Calculate additional insights
+  const bzMin = parseFloat(stats.bz.min);
+  const speedMax = stats.speed.max;
+  const densityMax = parseFloat(stats.density.max);
+  
+  // Determine visibility latitude at peak
+  let visibleLat = '70°N+ (Arctic only)';
+  if (bzMin < -25) visibleLat = '35°N (Southern US)';
+  else if (bzMin < -20) visibleLat = '40°N (Northern CA, NY)';
+  else if (bzMin < -15) visibleLat = '45°N (OR, WI, MI)';
+  else if (bzMin < -10) visibleLat = '50°N (WA, MN, ME)';
+  else if (bzMin < -5) visibleLat = '55°N (Canada border)';
+  else if (bzMin < -3) visibleLat = '60°N (Alaska, Canada)';
+  
+  // Calculate dynamic pressure at peak
+  const peakPressure = (1.6726e-6 * densityMax * speedMax * speedMax).toFixed(2);
+  
+  // G-scale estimate based on Bz
+  let gScaleEstimate = 'G0 (Quiet)';
+  if (bzMin < -25) gScaleEstimate = 'G4-G5 (Severe/Extreme)';
+  else if (bzMin < -15) gScaleEstimate = 'G3 (Strong)';
+  else if (bzMin < -10) gScaleEstimate = 'G2 (Moderate)';
+  else if (bzMin < -5) gScaleEstimate = 'G1 (Minor)';
+  
+  // Best viewing window (when Bz was most negative)
+  const peakTimeFormatted = peakTime ? new Date(peakTime).toLocaleTimeString('en-US', { 
+    hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' 
+  }) + ' PST' : 'N/A';
+  
   const subject = `${emoji} Aurora Daily Summary: ${verdict} conditions on ${stats.date}`;
   const body = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1 style="color: #1a1a2e;">${emoji} Yesterday's Aurora Summary</h1>
-      <p style="font-size: 18px; color: #4a4a6a;"><strong>Date:</strong> ${stats.date}</p>
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #0d1117; color: #e6edf3; padding: 0;">
       
-      <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 20px; border-radius: 10px; margin: 20px 0;">
-        <h2 style="margin-top: 0; color: #00d4aa;">${verdict}</h2>
-        <p style="font-size: 16px; margin-bottom: 0;">${description}</p>
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+        <h1 style="margin: 0; font-size: 28px; color: #ffffff;">${emoji} Aurora Daily Report</h1>
+        <p style="margin: 10px 0 0; font-size: 16px; color: #8b949e;">${stats.date}</p>
       </div>
       
-      <h2 style="color: #1a1a2e;">📊 Key Statistics</h2>
-      <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-        <tr style="background: #f0f0f5;">
-          <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Metric</th>
-          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd;">Min</th>
-          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd;">Max</th>
-          <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd;">Avg</th>
-        </tr>
-        <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #eee;">🌬️ Solar Wind Speed (km/s)</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.speed.min}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.speed.max}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.speed.avg}</td>
-        </tr>
-        <tr style="background: #f9f9fc;">
-          <td style="padding: 10px; border-bottom: 1px solid #eee;">📦 Density (p/cm³)</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.density.min}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.density.max}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.density.avg}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px; border-bottom: 1px solid #eee;">🧭 Bz Field (nT)</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee; ${parseFloat(stats.bz.min) < -5 ? 'color: #00aa00; font-weight: bold;' : ''}">${stats.bz.min}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.bz.max}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.bz.avg}</td>
-        </tr>
-        <tr style="background: #f9f9fc;">
-          <td style="padding: 10px; border-bottom: 1px solid #eee;">🔋 Bt Total Field (nT)</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.bt.min}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.bt.max}</td>
-          <td style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">${stats.bt.avg}</td>
-        </tr>
-      </table>
+      <!-- Verdict Banner -->
+      <div style="background: ${verdict === 'EXCELLENT' ? '#238636' : verdict === 'GOOD' ? '#1f6feb' : verdict === 'MODERATE' ? '#9e6a03' : '#484f58'}; padding: 25px; text-align: center;">
+        <h2 style="margin: 0; font-size: 32px; color: white;">${verdict}</h2>
+        <p style="margin: 10px 0 0; font-size: 16px; color: rgba(255,255,255,0.9);">${description}</p>
+      </div>
       
-      <h2 style="color: #1a1a2e;">🎯 Aurora Metrics</h2>
-      <ul style="font-size: 15px; line-height: 1.8;">
-        <li><strong>Peak G4 Similarity:</strong> ${peakSimilarity}%${peakTime ? ` (at ${peakTime.slice(11, 16)} UTC)` : ''}</li>
-        <li><strong>Hours with Good Bz (&lt;-5 nT):</strong> ~${goodBzHours} hours</li>
-        <li><strong>Data Points Analyzed:</strong> ${stats.dataPoints}</li>
-      </ul>
+      <!-- Quick Stats Grid -->
+      <div style="padding: 25px; background: #161b22;">
+        <h3 style="color: #58a6ff; margin: 0 0 15px; font-size: 18px;">📊 Quick Stats</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 15px; background: #21262d; border-radius: 8px 0 0 0; text-align: center; width: 25%;">
+              <div style="font-size: 24px; font-weight: bold; color: #58a6ff;">${peakSimilarity}%</div>
+              <div style="font-size: 12px; color: #8b949e; margin-top: 5px;">Peak G4 Match</div>
+            </td>
+            <td style="padding: 15px; background: #21262d; text-align: center; width: 25%;">
+              <div style="font-size: 24px; font-weight: bold; color: ${bzMin < -10 ? '#3fb950' : bzMin < -5 ? '#d29922' : '#f85149'};">${stats.bz.min} nT</div>
+              <div style="font-size: 12px; color: #8b949e; margin-top: 5px;">Min Bz</div>
+            </td>
+            <td style="padding: 15px; background: #21262d; text-align: center; width: 25%;">
+              <div style="font-size: 24px; font-weight: bold; color: #e6edf3;">${stats.speed.max}</div>
+              <div style="font-size: 12px; color: #8b949e; margin-top: 5px;">Max km/s</div>
+            </td>
+            <td style="padding: 15px; background: #21262d; border-radius: 0 8px 0 0; text-align: center; width: 25%;">
+              <div style="font-size: 24px; font-weight: bold; color: #e6edf3;">~${goodBzHours}h</div>
+              <div style="font-size: 12px; color: #8b949e; margin-top: 5px;">Good Bz Time</div>
+            </td>
+          </tr>
+        </table>
+      </div>
       
-      <div style="background: #f0f0f5; padding: 15px; border-radius: 8px; margin-top: 20px;">
-        <p style="margin: 0; font-size: 13px; color: #666;">
-          📍 This summary is generated daily at 8:00 AM PST.<br>
-          🔗 Visit your Aurora Tracker for real-time conditions.
+      <!-- Detailed Metrics Table -->
+      <div style="padding: 0 25px 25px; background: #161b22;">
+        <h3 style="color: #58a6ff; margin: 0 0 15px; font-size: 18px;">📈 Detailed Metrics</h3>
+        <table style="width: 100%; border-collapse: collapse; background: #21262d; border-radius: 8px; overflow: hidden;">
+          <tr style="background: #30363d;">
+            <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Metric</th>
+            <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Min</th>
+            <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Max</th>
+            <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Avg</th>
+            <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">G4 Ref</th>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-top: 1px solid #30363d; color: #e6edf3;">🧭 Bz Field (nT)</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: ${bzMin < -10 ? '#3fb950' : '#e6edf3'}; font-weight: ${bzMin < -10 ? 'bold' : 'normal'};">${stats.bz.min}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.bz.max}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.bz.avg}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #8b949e;">-30</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-top: 1px solid #30363d; color: #e6edf3;">🌬️ Speed (km/s)</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.speed.min}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: ${stats.speed.max > 600 ? '#3fb950' : '#e6edf3'};">${stats.speed.max}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.speed.avg}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #8b949e;">750</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-top: 1px solid #30363d; color: #e6edf3;">📦 Density (p/cm³)</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.density.min}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.density.max}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.density.avg}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #8b949e;">25</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border-top: 1px solid #30363d; color: #e6edf3;">🔋 Bt Field (nT)</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.bt.min}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.bt.max}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #e6edf3;">${stats.bt.avg}</td>
+            <td style="padding: 12px; border-top: 1px solid #30363d; text-align: center; color: #8b949e;">40</td>
+          </tr>
+        </table>
+      </div>
+      
+      <!-- Analysis Section -->
+      <div style="padding: 0 25px 25px; background: #161b22;">
+        <h3 style="color: #58a6ff; margin: 0 0 15px; font-size: 18px;">🔬 Analysis</h3>
+        <div style="background: #21262d; border-radius: 8px; padding: 20px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; color: #8b949e;">Estimated Storm Level:</td>
+              <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${gScaleEstimate}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #8b949e;">Visible Latitude (at peak):</td>
+              <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${visibleLat}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #8b949e;">Peak Dynamic Pressure:</td>
+              <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${peakPressure} nPa</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #8b949e;">Best Viewing Window:</td>
+              <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${peakTimeFormatted}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #8b949e;">Data Points Analyzed:</td>
+              <td style="padding: 8px 0; color: #e6edf3;">${stats.dataPoints.toLocaleString()}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Footer -->
+      <div style="background: #0d1117; padding: 20px 25px; border-top: 1px solid #30363d; border-radius: 0 0 12px 12px;">
+        <p style="margin: 0; font-size: 13px; color: #8b949e; text-align: center;">
+          📅 Daily summary sent at 8:00 AM PST<br>
+          🌌 <a href="https://aurora-tracker.azurewebsites.net" style="color: #58a6ff; text-decoration: none;">View Live Aurora Tracker →</a>
         </p>
       </div>
     </div>
@@ -601,19 +691,122 @@ function checkAndSendAlerts(data) {
 
   // Alert when GO conditions detected
   if (data.similarity >= 40 && data.bz < -5 && now - emailState.lastAlert > cooldown) {
-    const subject = `🌌 AURORA ALERT: GO Conditions Detected! (${data.similarity}% G4 Match)`;
+    // Calculate visibility latitude
+    let visibleLat = '65°N';
+    let visibleLocations = 'Alaska, Northern Canada';
+    if (data.bz < -25) { visibleLat = '35°N'; visibleLocations = 'Southern US (TX, FL, AZ)'; }
+    else if (data.bz < -20) { visibleLat = '40°N'; visibleLocations = 'Northern CA, NY, NV'; }
+    else if (data.bz < -15) { visibleLat = '45°N'; visibleLocations = 'OR, WI, MI, MA'; }
+    else if (data.bz < -10) { visibleLat = '50°N'; visibleLocations = 'WA, MN, ME, ND'; }
+    else if (data.bz < -5) { visibleLat = '55°N'; visibleLocations = 'Canada border states'; }
+    
+    // Determine urgency level
+    const urgency = data.similarity >= 60 ? 'STRONG' : data.similarity >= 50 ? 'GOOD' : 'MODERATE';
+    const urgencyColor = data.similarity >= 60 ? '#238636' : data.similarity >= 50 ? '#1f6feb' : '#9e6a03';
+    
+    // Current time in PST
+    const pstTime = new Date().toLocaleTimeString('en-US', { 
+      hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' 
+    });
+    
+    const subject = `🚨 AURORA GO ALERT: ${urgency} Conditions NOW! (${data.similarity}% G4 Match)`;
     const body = `
-      <h1>🌌 Aurora GO Alert!</h1>
-      <p>Current conditions indicate <strong>GO</strong> for aurora viewing!</p>
-      <h2>Key Metrics:</h2>
-      <ul>
-        <li><strong>G4 Similarity:</strong> ${data.similarity}%</li>
-        <li><strong>Bz Field:</strong> ${data.bz} nT (southward - GOOD!)</li>
-        <li><strong>Solar Wind:</strong> ${data.speed} km/s</li>
-        <li><strong>Dynamic Pressure:</strong> ${data.pressure} nPa</li>
-        <li><strong>Southward Duration:</strong> ${data.bzSouthDuration} min</li>
-      </ul>
-      <p>Check your local cloud conditions and head to a dark location!</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0d1117; color: #e6edf3;">
+        
+        <!-- Urgent Header -->
+        <div style="background: ${urgencyColor}; padding: 30px; text-align: center;">
+          <h1 style="margin: 0; font-size: 32px; color: white;">🚨 GO NOW!</h1>
+          <p style="margin: 10px 0 0; font-size: 18px; color: rgba(255,255,255,0.95);">${urgency} Aurora Conditions Detected</p>
+        </div>
+        
+        <!-- Time Banner -->
+        <div style="background: #161b22; padding: 15px; text-align: center; border-bottom: 1px solid #30363d;">
+          <span style="font-size: 14px; color: #8b949e;">Alert Time: </span>
+          <span style="font-size: 16px; color: #e6edf3; font-weight: bold;">${pstTime} PST</span>
+        </div>
+        
+        <!-- Key Metrics -->
+        <div style="padding: 25px; background: #161b22;">
+          <h2 style="color: #58a6ff; margin: 0 0 20px; font-size: 18px;">📊 Current Conditions</h2>
+          
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 15px; background: #21262d; border-radius: 8px; text-align: center; width: 50%;">
+                <div style="font-size: 36px; font-weight: bold; color: #3fb950;">${data.similarity}%</div>
+                <div style="font-size: 12px; color: #8b949e; margin-top: 5px;">G4 Storm Match</div>
+              </td>
+              <td style="width: 10px;"></td>
+              <td style="padding: 15px; background: #21262d; border-radius: 8px; text-align: center; width: 50%;">
+                <div style="font-size: 36px; font-weight: bold; color: #3fb950;">${data.bz.toFixed(1)} nT</div>
+                <div style="font-size: 12px; color: #8b949e; margin-top: 5px;">Bz Field (Southward!)</div>
+              </td>
+            </tr>
+          </table>
+          
+          <div style="background: #21262d; border-radius: 8px; padding: 20px; margin-top: 15px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #8b949e; width: 50%;">🌬️ Solar Wind Speed:</td>
+                <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${data.speed} km/s</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #8b949e;">⚡ Dynamic Pressure:</td>
+                <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${data.pressure.toFixed(2)} nPa</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #8b949e;">⏱️ Southward Duration:</td>
+                <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${data.bzSouthDuration} min</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #8b949e;">🧭 Clock Angle:</td>
+                <td style="padding: 8px 0; color: #e6edf3; font-weight: bold;">${data.clockAngle}°</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Visibility Info -->
+        <div style="padding: 0 25px 25px; background: #161b22;">
+          <div style="background: linear-gradient(135deg, #238636 0%, #1a7f37 100%); border-radius: 8px; padding: 20px;">
+            <h3 style="color: white; margin: 0 0 10px; font-size: 16px;">🌍 Where to See It</h3>
+            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 15px;">
+              <strong>Visible as far south as:</strong> ${visibleLat}<br>
+              <strong>Locations:</strong> ${visibleLocations}
+            </p>
+          </div>
+        </div>
+        
+        <!-- Action Steps -->
+        <div style="padding: 0 25px 25px; background: #161b22;">
+          <h2 style="color: #58a6ff; margin: 0 0 15px; font-size: 18px;">✅ What To Do NOW</h2>
+          <div style="background: #21262d; border-radius: 8px; padding: 20px;">
+            <ol style="margin: 0; padding-left: 20px; color: #e6edf3; line-height: 2;">
+              <li><strong>Check local clouds</strong> - Need clear skies to see aurora</li>
+              <li><strong>Find a dark location</strong> - Away from city lights</li>
+              <li><strong>Face NORTH</strong> - Aurora appears on northern horizon</li>
+              <li><strong>Allow 20 min</strong> for eyes to adjust to darkness</li>
+              <li><strong>Be patient</strong> - Aurora can pulse and fade</li>
+            </ol>
+          </div>
+        </div>
+        
+        <!-- Pro Tips -->
+        <div style="padding: 0 25px 25px; background: #161b22;">
+          <div style="background: #21262d; border-radius: 8px; padding: 15px; border-left: 4px solid #58a6ff;">
+            <p style="margin: 0; color: #8b949e; font-size: 13px;">
+              💡 <strong style="color: #e6edf3;">Pro Tip:</strong> Use your phone camera to detect faint aurora - cameras are more sensitive than eyes. Take a 5-10 second exposure pointing north.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: #0d1117; padding: 20px 25px; border-top: 1px solid #30363d;">
+          <p style="margin: 0; font-size: 13px; color: #8b949e; text-align: center;">
+            🌌 <a href="https://aurora-tracker.azurewebsites.net" style="color: #58a6ff; text-decoration: none;">Open Live Tracker →</a><br>
+            <span style="font-size: 11px;">Alert cooldown: ${EMAIL_CONFIG.cooldownMinutes} minutes</span>
+          </p>
+        </div>
+      </div>
     `;
     sendEmail(subject, body);
     emailState.lastAlert = now;
