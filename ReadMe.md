@@ -80,9 +80,8 @@ ALERT_LOCATION_NAME=Seattle, WA
 ```
 
 **Features:**
-- **Startup notification** - Confirms server is running when it starts
 - **Real-time GO alerts** - When conditions are favorable AND sky is dark at your location
-- **Daily summary at 8 AM PST** - Yesterday's aurora conditions analysis
+- **Daily summary at 8 AM PST** - Yesterday's aurora conditions analysis (with catch-up on restart)
 
 ## Decision Logic
 

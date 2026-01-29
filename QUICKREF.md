@@ -251,13 +251,6 @@ const skyScore = 100 - weighted;
 
 ## Email Alerts
 
-### Startup Notification
-
-When the server starts with email enabled, a welcome email is sent confirming:
-- Server start time (PST)
-- Alert location configured
-- Number of recipients
-
 ### Real-time GO Alerts
 
 Triggered when GO conditions detected AND sky is dark:
@@ -273,6 +266,8 @@ Sent daily at 8:00 AM PST with yesterday's aurora conditions:
 - Min/max/avg for all metrics (speed, density, Bz, Bt)
 - Hours with good Bz conditions (< -5 nT)
 - Overall verdict: EXCELLENT / GOOD / MODERATE / QUIET
+
+**Catch-up on restart**: If server restarts after 8 AM and today's summary hasn't been sent, it sends immediately. State persisted in `.daily-summary-state.json`.
 
 **Configuration** (environment variables):
 ```
