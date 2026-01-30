@@ -1,9 +1,10 @@
 /**
- * Aurora Tracker v1.2.0
+ * Overwatch - Aurora Module v3.0.0
  * 
  * Real-time aurora viewing decision based on DSCOVR/ACE satellite data.
  * Binary GO/NO GO - no uncertainty, no MAYBE.
  * 
+ * Part of the Overwatch 24x7 Monitoring Service
  * Reference: May 10-11, 2024 G4 Storm (strongest in 20+ years)
  */
 
@@ -900,7 +901,9 @@ class AuroraTracker {
 // =============================================================================
 const tracker = new AuroraTracker();
 
-document.addEventListener('DOMContentLoaded', async () => {
+// Expose init function for dynamic loading (Overwatch main controller)
+window.auroraTrackerInit = async function() {
+  console.log('[Aurora] Initializing tracker...');
   initGeolocation();
   initTooltips();
   
@@ -908,8 +911,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await tracker.fetchData();
     tracker.render();
 
-    // Auto-refresh every 2 minutes
-    setInterval(async () => {
+    // Auto-refresh every 2 minutes (clear any existing interval first)
+    if (window.auroraRefreshInterval) {
+      clearInterval(window.auroraRefreshInterval);
+    }
+    window.auroraRefreshInterval = setInterval(async () => {
       try {
         await tracker.fetchData();
         tracker.render();
@@ -922,7 +928,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Initial fetch failed:', error);
     tracker.renderError(error.message);
   }
-});
+};
+
+// Auto-initialize on DOMContentLoaded (for standalone use)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', window.auroraTrackerInit);
+} else {
+  // DOM already loaded (dynamically loaded script)
+  window.auroraTrackerInit();
+}
 
 // Retry button
 document.addEventListener('click', (e) => {

@@ -1,0 +1,175 @@
+/* Overwatch Charts CSS */
+
+/* ===========================================
+   CHART COMPONENTS
+   =========================================== */
+
+.ow-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ow-sparkline {
+  width: 100%;
+  height: 100%;
+}
+
+.chart-no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
+
+/* Line Chart */
+.line-chart .chart-line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line-chart .chart-area {
+  opacity: 0.3;
+}
+
+.line-chart .chart-dot {
+  fill: var(--bg);
+  stroke: #6366f1;
+  stroke-width: 2;
+}
+
+.line-chart .grid-line {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.line-chart .y-label,
+.line-chart .x-label {
+  fill: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+}
+
+.line-chart .y-label {
+  text-anchor: end;
+}
+
+.line-chart .x-label {
+  text-anchor: middle;
+}
+
+/* Animation */
+.line-chart.animate-draw .chart-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: drawLine 1.5s ease-out forwards;
+}
+
+@keyframes drawLine {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Candlestick Chart */
+.candlestick-chart .y-label {
+  fill: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  text-anchor: end;
+}
+
+/* Bar Chart */
+.bar-chart .bar-value {
+  fill: rgba(255, 255, 255, 0.7);
+  font-size: 9px;
+  text-anchor: middle;
+}
+
+.bar-chart .x-label {
+  fill: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  text-anchor: middle;
+}
+
+/* Gauge Chart */
+.ow-gauge .gauge-value {
+  fill: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.ow-gauge .gauge-label {
+  fill: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+
+/* Stock Sparkline */
+.stock-sparkline {
+  width: 80px;
+  height: 25px;
+  margin: 8px 0;
+}
+
+.stock-extra {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75em;
+  color: var(--text-dim);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Chart Container */
+.chart-container {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.chart-container h4 {
+  font-size: 0.85em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+/* Chart Toggle */
+.chart-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.chart-toggle button {
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chart-toggle button:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.chart-toggle button.active {
+  background: rgba(99, 102, 241, 0.3);
+  color: var(--text);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .chart-container {
+    padding: 12px;
+  }
+  
+  .stock-sparkline {
+    width: 60px;
+    height: 20px;
+  }
+}

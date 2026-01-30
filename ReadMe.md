@@ -1,126 +1,307 @@
-# 🌌 Aurora Tracker
+# 👁️ Overwatch v3.0.0
 
-Real-time aurora visibility tracker with a definitive **GO** or **NO GO** decision.
+**24x7 Monitoring Service Platform**
 
-**No uncertainty. No "maybe". Just a clear answer: Should you go outside NOW?**
+A comprehensive monitoring dashboard for tracking aurora conditions, cryptocurrency, stock markets, and breaking news - all from free APIs with no keys required!
 
-## Features
+![Version](https://img.shields.io/badge/version-3.0.0-blue)
+![Node](https://img.shields.io/badge/node-18%2B-green)
+![Tests](https://img.shields.io/badge/tests-59%20passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
+---
+
+## 📸 Module Overview
+
+| Module | Description |
+|--------|-------------|
+| **Dashboard** | At-a-glance overview of all monitoring services with quick access widgets |
+| **Aurora** | Binary GO/NO GO decision based on real space physics data + current weather |
+| **Crypto** | Top 10 cryptocurrency prices with sparkline charts and market stats |
+| **Stocks** | Custom watchlist with interactive charts and market movers |
+| **News** | Multi-source RSS aggregation from BBC, NPR, CNBC, Bloomberg |
+| **Settings** | Theme, watchlists, location, and notification configuration |
+
+---
+
+## 🤖 For AI Agents
+
+> **⚠️ IMPORTANT**: Before making any changes to this codebase, please read **[QUICKREF.md](QUICKREF.md)** first. It contains complete technical specifications, API documentation, and architecture details.
+
+---
+
+## 🚀 Features
+
+### 📊 Dashboard
+- **At-a-glance widgets** for all monitored services
+- **Quick access** to all modules
+- **Auto-refresh** every 2 minutes
+- **Personalized greeting** based on time of day
+
+### 🌌 Aurora Tracker
 - **Binary Decision**: GO or NO GO based on actual space physics
 - **Location-Aware**: Calculates if aurora can reach YOUR latitude
-- **Real-time Data**: DSCOVR/ACE satellite data (not delayed Kp index)
+- **Real-time Data**: DSCOVR/ACE satellite solar wind data
 - **NOAA OVATION Model**: Official aurora forecast (30-90 min prediction)
 - **Local Sky Check**: Cloud coverage at your GPS location
-- **Desktop & Mobile**: Responsive design works everywhere
-- **Email Alerts**: Real-time GO alerts + daily summary reports
+- **Current Weather**: Today's conditions right on the aurora page
+- **Smart Viewing Tips**: Weather-based recommendations for aurora viewing
 - **7 Space Weather Metrics**: Bz, Speed, Pressure, Density, Bt, Clock Angle, Duration
 
-## The Science
+### 💰 Cryptocurrency
+- **Top 10 coins** with real-time prices
+- **24h price changes** with sparkline charts
+- **Global market stats**: Total market cap, volume, BTC dominance
+- **Market sentiment** indicator (Fear & Greed approximation)
 
-Aurora requires four things:
-1. **Darkness** - Aurora is only visible at night (sun below horizon)
-2. **Southward IMF (Bz < 0)** - Opens Earth's magnetosphere to solar wind
-3. **Strong Solar Wind** - Speed + density = energy input
-4. **Clear Sky** - You need to actually see it
+### 📈 Stock Market
+- **Custom watchlist**: Default tracks AI & Big Tech leaders
+  - MSFT, NVDA, TSLA, META, GOOGL, AAPL, AMD, PLTR, SMCI, ARM
+- **US Market Top Movers**: Top 10 gainers & losers from NYSE, NASDAQ, AMEX
+- **Company Profiles**: Brief descriptions for 90+ popular stocks
+- **Major indices**: S&P 500, NASDAQ Composite, DOW Jones
+- **Interactive charts**: Click any stock for price trend modal
+- **Email alerts**: Automatic notification for >20% moves
 
-We use real-time **Bz field** and **solar wind data** from DSCOVR/ACE satellites instead of Kp index (which is delayed 3+ hours).
+### 📰 Breaking News
+- **Multi-source aggregation**: BBC, NPR, TechCrunch, CNBC, Bloomberg, etc.
+- **Category filtering**: Technology, Business, Science, etc.
+- **Time-based sorting** with relative timestamps
+- **Breaking news highlights**
 
-### Reference: May 2024 G4 Storm
+### ⚙️ Settings
+- **Theme**: Dark/Light mode
+- **Custom watchlists** for stocks and crypto
+- **Location settings** for weather
+- **Refresh intervals** configuration
+- **Keyboard shortcuts** for power users
+- **Browser notifications** (optional)
 
-All metrics are compared to the May 10-11, 2024 G4 geomagnetic storm - the strongest in 20+ years when aurora was visible as far south as Florida.
+---
 
-## Quick Start
+## 🛠️ Technical Stack
+
+### Free Data Sources (No API Keys Required!)
+| Source | Data Provided |
+|--------|---------------|
+| NOAA DSCOVR/ACE | Real-time solar wind data |
+| NOAA OVATION | Aurora probability forecast |
+| Open-Meteo | Weather and cloud coverage |
+| CoinGecko | Cryptocurrency prices |
+| Yahoo Finance | Stock prices, indices, movers |
+| RSS Feeds | News from major outlets |
+
+### Tech Stack
+- **Backend**: Node.js 18+ with native HTTP (no Express)
+- **Frontend**: Vanilla JavaScript ES Modules
+- **Styling**: CSS3 with CSS Variables (dark/light themes)
+- **Charts**: Custom SVG-based (no dependencies)
+- **PWA**: Service Worker for offline support
+- **Testing**: Node.js built-in test runner (59 tests)
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-# Install
+# Clone the repo
+git clone <repo-url>
+cd overwatch
+
+# Install dependencies (just dotenv!)
 npm install
 
-# Run
-node server.js
+# Start the server
+npm start
 
-# Open
-open http://localhost:8000
+# Run tests
+npm test
 ```
 
-## Data Sources
+Visit **http://localhost:8000**
 
-- **NOAA SWPC**: Real-time solar wind from DSCOVR/ACE satellites
-- **NOAA OVATION**: Official aurora probability forecast model
-- **Open-Meteo**: Cloud coverage by GPS coordinates
+---
 
-## Metrics Displayed
+## ⌨️ Keyboard Shortcuts
 
-| Metric | Why It Matters |
-|--------|----------------|
-| **Bz Field** | THE key factor - negative = aurora possible |
-| **Solar Wind Speed** | Faster = more energy hitting magnetosphere |
-| **Dynamic Pressure** | How hard solar wind pushes Earth's field |
-| **Particle Density** | More particles = brighter aurora |
-| **Bt Field** | Total magnetic field strength |
-| **Clock Angle** | IMF direction (180° = pure south = best) |
-| **Bz Duration** | Sustained southward (60 min window) better than spikes |
+| Key | Action |
+|-----|--------|
+| `1` | Dashboard |
+| `2` | Aurora |
+| `3` | Weather |
+| `4` | Crypto |
+| `5` | Stocks |
+| `6` | News |
+| `S` | Settings |
+| `R` | Refresh current view |
 
-## Email Alerts (Optional)
+---
 
-Get notified when GO conditions are detected, plus daily summary reports.
+## 📱 Mobile Support
 
-Create `.env` file:
-```
+- **Touch-optimized** tabs with 48px+ tap targets
+- **Responsive design** - single column on mobile
+- **PWA installable** - add to home screen
+- **Offline support** via Service Worker
+
+### Install as PWA
+
+1. Open in Chrome/Edge on mobile
+2. Tap the menu → "Add to Home Screen"
+3. Enjoy native-like experience!
+
+---
+
+## 🔧 Configuration (Optional)
+
+Create a `.env` file for optional features:
+
+```env
+# Server
+PORT=8000
+
+# Email Alerts (Optional - requires Gmail App Password)
 EMAIL_ENABLED=true
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
+SMTP_USER=your@email.com
 SMTP_PASS=your-app-password
-FROM_EMAIL=your-email@gmail.com
-EMAIL_RECIPIENTS=you@email.com
+EMAIL_RECIPIENTS=you@email.com,friend@email.com
 EMAIL_COOLDOWN=60
+
+# Alert Location (for aurora & stock notifications)
 ALERT_LATITUDE=47.6
 ALERT_LONGITUDE=-122.3
 ALERT_LOCATION_NAME=Seattle, WA
+
+# Module Toggles
+AURORA_ENABLED=true
+STOCKS_ENABLED=true
+NEWS_ENABLED=true
+
+# Stock Watchlist (comma-separated)
+STOCKS_WATCHLIST=MSFT,NVDA,TSLA,META,GOOGL,AAPL,AMD,PLTR,SMCI,ARM
 ```
 
-**Features:**
-- **Real-time GO alerts** - When conditions are favorable AND sky is dark at your location
-- **Daily summary at 8 AM PST** - Yesterday's aurora conditions analysis (with catch-up on restart)
+---
 
-## Decision Logic
-
-The decision is **conservative** and **location-aware**:
+## 📊 Project Structure
 
 ```
-NO GO if:
-- Daytime (sun above horizon - aurora not visible)
-- Bz ≥ 0 (northward - magnetosphere closed)
-- Aurora won't reach your latitude
-- Bz weakly south with low pressure
-- Low clouds > 50%
-- Total sky clarity < 40%
-
-GO if:
-- Dark enough (sun below horizon)
-- Strong southward Bz that reaches your latitude + clear sky
-- Good margin between aurora visibility and your location
-- Supported by NOAA OVATION forecast
+overwatch/
+├── server.js              # Main server (~2100 lines)
+├── package.json
+├── QUICKREF.md            # Technical reference (READ FIRST!)
+├── ReadMe.md              # This file
+│
+├── src/
+│   ├── index.html         # Main SPA entry
+│   ├── css/
+│   │   ├── styles.css     # Base styles
+│   │   ├── overwatch.css  # Module styles (~2900 lines)
+│   │   └── charts.css     # Chart styles
+│   ├── js/
+│   │   ├── overwatch-main.js  # Main controller
+│   │   ├── aurora-tracker.js  # Aurora decision logic
+│   │   └── charts.js          # SVG chart library
+│   └── modules/           # Feature modules
+│       ├── dashboard/
+│       ├── aurora/
+│       ├── weather/
+│       ├── crypto/
+│       ├── stocks/        # Includes 90+ company profiles
+│       ├── news/
+│       └── settings/
+│
+├── public/
+│   ├── manifest.json      # PWA manifest
+│   └── sw.js              # Service worker
+│
+└── tests/
+    └── server.test.js     # 59 comprehensive tests
 ```
 
-Marginal cases are NO GO - we're conservative to avoid false hope.
+---
 
-## Screenshots
+## 🚀 Deploy to Azure
 
-### Desktop
-Decision card stays visible while scrolling through data.
+The deploy script uses **Basic (B1) tier** for 24x7 Always On support:
 
-![Aurora Tracker Desktop - GO Decision](public/assets/screenshot-desktop.png)
+```bash
+# Quick deploy script included!
+./quick-deploy.sh
+```
 
-### Mobile
-All information in single column, touch-friendly tooltips.
+Or manually:
+```bash
+# Create resource group
+az group create --name overwatch-rg --location eastus
 
-![Aurora Tracker Mobile](public/assets/screenshot-mobile.png)
+# Create Basic tier plan (supports Always On)
+az appservice plan create --name overwatch --resource-group overwatch-rg --sku B1 --is-linux
 
-## Development
+# Create and deploy
+az webapp up --name overwatch --resource-group overwatch-rg --plan overwatch --runtime "NODE|22-lts"
 
-See [QUICKREF.md](QUICKREF.md) for complete technical documentation.
+# Enable Always On
+az webapp config set --name overwatch --resource-group overwatch-rg --always-on true
+```
 
-## License
+> **Note**: Basic tier (~$13/month) is required for 24x7 uptime. Free tier apps sleep after 20 minutes of inactivity.
 
-MIT
+---
+
+## 🧪 Testing
+
+```bash
+# Run all 59 tests
+npm test
+
+# Test coverage by category:
+# - Static Files: 10 tests
+# - Aurora APIs: 12 tests
+# - Weather APIs: 11 tests
+# - Stocks APIs: 15 tests
+# - Crypto/News: 4 tests
+# - Status: 3 tests
+# - Security: 7 tests
+```
+
+---
+
+## 📋 API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/solar-wind` | Real-time solar wind data |
+| `GET /api/clouds` | Cloud coverage & forecast |
+| `GET /api/ovation` | Aurora probability model |
+| `GET /api/aurora/status` | GO/NO GO decision |
+| `GET /api/stocks/prices` | Watchlist prices |
+| `GET /api/stocks/nasdaq-movers` | Top 10 US market movers |
+| `GET /api/stocks/chart` | Stock price charts |
+| `GET /api/crypto/prices` | Crypto prices |
+| `GET /api/weather/forecast` | Weather forecast |
+| `GET /api/news/headlines` | News headlines |
+| `GET /api/status` | Server health |
+
+---
+
+## 📄 License
+
+MIT License - Do what you want with it!
+
+---
+
+## 🙏 Credits
+
+Data provided by:
+- [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/)
+- [Open-Meteo](https://open-meteo.com/)
+- [CoinGecko](https://www.coingecko.com/)
+- [Yahoo Finance](https://finance.yahoo.com/)
+- Various RSS feeds (BBC, NPR, TechCrunch, CNBC, Bloomberg, Ars Technica, Hacker News, NASA)
+
+---
+
+**Built with ❤️ as a 24x7 monitoring companion**

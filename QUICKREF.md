@@ -1,399 +1,329 @@
-# QUICKREF.md - Aurora Tracker v1.2.0
+# QUICKREF.md - Overwatch v3.0.0
 
-> **For AI Agents**: Complete technical specifications for the Aurora Tracker application.
-
----
-
-## System Overview
-
-**Purpose**: Real-time aurora visibility tracker with binary GO/NO GO decision.
-
-**Core Decision**: **GO** or **NO GO** (no middle ground!) based on:
-1. **Darkness** - Is it night? (sun below horizon)
-2. **Space Weather** - Is aurora actually happening? (Bz, speed, pressure)
-3. **Sky Conditions** - Can you see it? (cloud coverage by layer)
-
-**Key Insight**: We use **Bz field** and real-time satellite data instead of Kp index because:
-- Kp is a 3-hour average, delayed by hours
-- Bz and pressure are real-time from DSCOVR/ACE satellites
-- Physics-based decision vs lagging indicator
-
-**Architecture**: Node.js server proxying NOAA + Open-Meteo APIs → Responsive HTML/CSS/JS frontend
+> **⚠️ FOR AI AGENTS**: Read this file FIRST before making any changes to this codebase. This contains the complete technical specifications for the Overwatch 24x7 monitoring service.
 
 ---
 
-## File Structure
+## 🎯 System Overview
+
+**Project Name**: Overwatch  
+**Purpose**: 24x7 monitoring service platform with modular trackers  
+**Version**: 3.0.0  
+**Node.js**: 18+ (ES Modules)  
+**Deployment**: Azure App Service (Basic B1 for Always On)
+
+### Core Modules
+
+| Module | Description | Data Source |
+|--------|-------------|-------------|
+| Dashboard | At-a-glance overview of all services | All APIs |
+| Aurora | Real-time aurora visibility + current weather | NOAA DSCOVR/ACE, Open-Meteo |
+| Crypto | Top cryptocurrency prices & market stats | CoinGecko |
+| Stocks | Stock watchlist + US market movers | Yahoo Finance |
+| News | Breaking news from RSS feeds | BBC, NPR, CNBC, etc. |
+| Settings | Theme, watchlist, location config | Local storage |
+
+> **Note**: Weather data is integrated into the Aurora page for viewing conditions. No separate Weather tab.
+
+### Architecture
 
 ```
-aurora-tracker/
-├── server.js                    # Backend: API proxy, data processing, email alerts
-├── src/
-│   ├── index.html               # Frontend: Responsive 2-column layout
-│   ├── js/aurora-tracker.js     # Client: Decision logic, rendering
-│   └── css/styles.css           # Styling: Mobile-first, desktop 2-column
-├── public/
-│   └── assets/                  # Static assets (favicon, images)
-├── scripts/
-│   └── build.js                 # Build script
-├── tests/                       # Test files
-├── package.json                 # Dependencies
+┌─────────────────────────────────────────────────────────────┐
+│                        Frontend                              │
+│  src/index.html → Tabbed SPA (vanilla JS ES Modules)        │
+│  src/modules/*  → Individual module JS files                │
+│  src/css/*      → Modular stylesheets                       │
+└─────────────────────────────────────────────────────────────┘
+                              ↑ HTTP/JSON
+┌─────────────────────────────────────────────────────────────┐
+│                     server.js (Node.js)                      │
+│  - API proxy with caching                                    │
+│  - Static file serving                                       │
+│  - Email alerts (optional)                                   │
+│  - Daily summary emails (optional)                           │
+└─────────────────────────────────────────────────────────────┘
+                              ↑ HTTPS
+┌─────────────────────────────────────────────────────────────┐
+│                    External APIs (FREE)                      │
+│  NOAA, Open-Meteo, CoinGecko, Yahoo Finance, RSS Feeds      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 File Structure
+
+```
+overwatch/
+├── server.js                    # Backend: ~2100 lines, all API routes
+├── package.json                 # Dependencies (minimal: dotenv only)
+├── .env                         # Optional config (email, alerts)
+├── .eslintrc.json               # ESLint config (2-space indent)
 ├── quick-deploy.sh              # Azure deployment script
-├── QUICKREF.md                  # This file (AI reference)
-└── ReadMe.md                    # Human-readable documentation
+├── QUICKREF.md                  # This file - AI reference
+├── ReadMe.md                    # Human documentation
+│
+├── src/
+│   ├── index.html               # Main SPA entry point
+│   ├── css/
+│   │   ├── styles.css           # Base/reset styles
+│   │   ├── overwatch.css        # Module styles (~2900 lines)
+│   │   └── charts.css           # Chart component styles
+│   ├── js/
+│   │   ├── overwatch-main.js    # Main controller & router
+│   │   ├── aurora-tracker.js    # Aurora decision logic
+│   │   └── charts.js            # SVG chart library
+│   └── modules/
+│       ├── dashboard/dashboard.js
+│       ├── aurora/aurora.js     # Includes current weather display
+│       ├── crypto/crypto.js
+│       ├── stocks/stocks.js     # ~1050 lines, company DB
+│       ├── news/news.js
+│       └── settings/settings.js
+│
+├── public/
+│   ├── manifest.json            # PWA manifest
+│   ├── favicon.svg              # App favicon
+│   └── sw.js                    # Service worker
+│
+└── tests/
+    └── server.test.js           # 59 tests (Node.js test runner)
 ```
 
 ---
 
-## Data Sources
+## 🔌 API Endpoints
 
-### NOAA Space Weather APIs
+### Aurora APIs
 
-| API | URL | Data |
-|-----|-----|------|
-| Plasma | `services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json` | Speed, Density, Temperature |
-| Magnetometer | `services.swpc.noaa.gov/products/solar-wind/mag-7-day.json` | Bx, By, Bz, Bt |
-| Scales | `services.swpc.noaa.gov/products/noaa-scales.json` | G-Scale (storm level) - Current & Predicted |
-| OVATION | `services.swpc.noaa.gov/json/ovation_aurora_latest.json` | Aurora probability forecast (30-90 min) |
+| Endpoint | Description | Cache |
+|----------|-------------|-------|
+| `GET /api/solar-wind` | Real-time solar wind data | 2 min |
+| `GET /api/clouds?lat=&lon=` | Cloud coverage & forecast | 15 min |
+| `GET /api/ovation?lat=&lon=` | NOAA aurora probability | 10 min |
+| `GET /api/aurora/status` | Combined aurora GO/NO GO status | 2 min |
 
-### Derived Calculations
+### Market APIs
 
-| Metric | Formula | Purpose |
-|--------|---------|---------|
-| **Dynamic Pressure** | `P = 1.67e-6 × density × speed²` (nPa) | Magnetosphere compression |
-| **Clock Angle** | `θ = atan2(By, Bz)` (degrees) | IMF direction, 180° = best |
-| **Bz Duration** | Count of southward readings in last 60 min | Sustained vs spike |
+| Endpoint | Description | Cache |
+|----------|-------------|-------|
+| `GET /api/stocks/prices` | Watchlist stocks + indices | 1 min |
+| `GET /api/stocks/market-status` | NYSE open/close status | 1 min |
+| `GET /api/stocks/nasdaq-movers` | Top 10 US market movers | 10 min |
+| `GET /api/stocks/chart?symbol=&range=` | Stock price chart data | 5 min |
+| `GET /api/crypto/prices` | Top 10 crypto prices | 2 min |
 
-### Cloud Data
+### Other APIs
 
-- **Source**: Open-Meteo API (`api.open-meteo.com/v1/forecast`)
-- **Layers**: Low (0-2km), Mid (2-6km), High (6km+)
-- **Trend**: 6-hour forecast direction (clearing/increasing/stable)
-
----
-
-## API Endpoints
-
-### GET /api/solar-wind
-
-Returns processed space weather data with all derived metrics.
-
-```typescript
-{
-  time: string;           // ISO timestamp
-  // Raw measurements
-  speed: number;          // km/s (normal: 400, storm: 600+)
-  density: number;        // p/cm³ (normal: 5, storm: 15+)
-  temperature: number;    // K
-  bz: number;             // nT (negative = southward = aurora!)
-  bt: number;             // nT (total field)
-  bx: number;             // nT (sunward component)
-  by: number;             // nT (east-west component)
-  // Derived values
-  pressure: number;       // nPa (dynamic pressure)
-  clockAngle: number;     // degrees (180 = pure south)
-  bzSouthDuration: number;// minutes in last 60 min
-  auroraPower: number;    // GW estimate
-  // Scores (% of G4 baseline)
-  scores: {
-    bz: number;
-    speed: number;
-    density: number;
-    bt: number;
-    pressure: number;
-    temperature: number;
-  };
-  similarity: number;     // 0-99% match to G4 storm
-  // NOAA official - Current Observed
-  gScale: number;         // 0-5 (current)
-  gText: string;          // "none" | "minor" | etc.
-  gObservedTime: string;  // ISO timestamp
-  // NOAA official - Predicted (24h)
-  gPredicted: number;     // 0-5 (predicted)
-  gPredictedText: string; // "none" | "minor" | etc.
-  gPredictedTime: string; // ISO timestamp
-  // Reference
-  baseline: {             // G4 storm values for comparison
-    speed: 750, density: 25, bz: 30, bt: 40, pressure: 15, ...
-  }
-}
-```
-
-### GET /api/clouds?lat={lat}&lon={lon}
-
-Returns cloud coverage with forecast trend.
-
-```typescript
-{
-  total: number;     // 0-100%
-  low: number;       // 0-100% (blocks aurora)
-  mid: number;       // 0-100% (reduces clarity)
-  high: number;      // 0-100% (minor effect)
-  visibility: number;// meters
-  weatherCode: number;// WMO weather code
-  trend: string;     // "clearing" | "increasing" | "stable"
-  forecast: number[];// Next 6 hours low cloud %
-  time: string;      // ISO timestamp
-}
-```
-
-### GET /api/ovation?lat={lat}&lon={lon}
-
-Returns NOAA OVATION aurora forecast model data.
-
-```typescript
-{
-  observationTime: string;  // ISO timestamp
-  forecastTime: string;     // ISO timestamp (30-90 min ahead)
-  atLocation: number;       // Aurora probability at your coordinates (0-100)
-  nearbyMax: number;        // Max probability visible on northern horizon (0-100)
-  nearbyMaxLat: number;     // Latitude of max aurora activity
-  viewable: boolean;        // Whether aurora may be viewable
-}
-```
+| Endpoint | Description | Cache |
+|----------|-------------|-------|
+| `GET /api/weather/forecast?lat=&lon=` | Full weather forecast | 15 min |
+| `GET /api/news/headlines` | Aggregated RSS news | 5 min |
+| `GET /api/status` | Server health & module status | None |
 
 ---
 
-## Decision Logic
+## 📊 Stocks Module Details
 
-### Binary GO / NO GO Rules (Location-Aware)
+### US Market Movers
 
-The decision logic is **conservative**, **latitude-aware**, and **time-aware** - aurora must reach your location and it must be dark.
+Fetches **top 10 gainers and losers** from ALL US exchanges:
+- NYSE (NYQ, NYS)
+- NASDAQ (NMS, NGM, NCM, NIM)
+- AMEX (ASE)
+- NYSE ARCA (PCX)
 
+### Watchlist (Default)
+
+Big Tech + AI Leaders:
 ```javascript
-// STEP 0: Calculate darkness (sun position)
-sunAltitude = calculateSunPosition(lat, lon, time)
-if (sunAltitude > 0)      → NO GO  // Daytime - aurora not visible
-if (sunAltitude > -6)     → MARGINAL  // Civil twilight - maybe visible
-
-// STEP 1: Calculate visible latitude based on Bz and G-Scale
-visibleLat = getVisibleLatitude(bz, gScale, speed)
-// G5: 30°N, G4: 35°N, G3: 45°N, G2: 50°N, G1: 55°N
-// Or Bz-based: -25nT→35°, -20nT→40°, -15nT→45°, etc.
-
-latitudeMargin = userLatitude - visibleLat  // negative = aurora won't reach you
-
-// STEP 2: ABSOLUTE NO GO CONDITIONS
-if (bz >= 0)              → NO GO  // Northward IMF, magnetosphere closed
-if (latitudeMargin < 0)   → NO GO  // Aurora won't reach your latitude
-if (bz > -5 && !pressureHigh) → NO GO  // Too weak for mid-latitudes
-if (lowClouds > 50%)      → NO GO  // Can't see through low clouds
-if (skyClarity < 40%)     → NO GO  // Too cloudy overall
-
-// STEP 3: GO CONDITIONS (conservative scoring)
-goScore = 0
-if (bz < -15)    goScore += 35  // Extreme southward
-if (bz < -8)     goScore += 25  // Strong southward
-if (bz < -3)     goScore += 12  // Good southward
-if (bzDuration >= 15 && bzStrong) goScore += 12  // Sustained + strong
-if (speed > 600) goScore += 12  // CME speeds
-if (speed > 450) goScore += 6   // Enhanced
-if (pressure > 3) goScore += 6  // High pressure
-if (goodClockAngle) goScore += 4  // 120°-240°
-if (latitudeMargin > 10) goScore += 10  // Strong margin
-if (latitudeMargin > 5) goScore += 5   // Good margin
-if (sky >= 60)   goScore += 8   // Clear sky
-if (sky >= 40)   goScore += 4   // Partly clear
-
-// OVATION Model bonus (supporting evidence)
-if (ovationAtLocation >= 30%) goScore += 8
-if (ovationNearby >= 40%) goScore += 4
-
-// STEP 4: FINAL DECISION
-if (goScore >= 55 && sky >= 60 && latitudeMargin >= 5) → GO (high confidence)
-if (goScore >= 45 && sky >= 50 && latitudeMargin >= 0) → GO (good conditions)
-if (goScore >= 35 && sky >= 50 && latitudeMargin >= -3) → NO GO (marginal)
-else → NO GO
+['MSFT', 'NVDA', 'TSLA', 'META', 'GOOGL', 'AAPL', 'AMD', 'PLTR', 'SMCI', 'ARM']
 ```
 
-### Why No MAYBE?
+### Company Info Database
 
-- User needs actionable decision
-- MAYBE leads to paralysis
-- Either conditions justify going out, or they don't
-- But we're **conservative** - marginal cases are NO GO, not GO
+The stocks module includes a built-in company database (`COMPANY_INFO`) with:
+- **90+ companies** with sector tags and brief descriptions
+- Used to provide context for market movers
+- Shows sector badge and company description on mover cards
 
----
-
-## G4 Storm Baseline (May 10-11, 2024)
-
-Reference values from the strongest geomagnetic storm in 20+ years:
-
-| Metric | Peak Value | Typical Quiet |
-|--------|------------|---------------|
-| Bz | -30 nT | -2 to +2 nT |
-| Speed | 750 km/s | 400 km/s |
-| Density | 25 p/cm³ | 5 p/cm³ |
-| Bt | 40 nT | 5 nT |
-| Pressure | 15 nPa | 2 nPa |
-| Temperature | 500,000 K | 100,000 K |
-
-**Similarity Score Weights**:
-- Bz: 40% (most critical)
-- Speed: 20%
-- Density: 15%
-- Bt: 10%
-- Pressure: 10%
-- Temperature: 5%
-
----
-
-## Sky Score Calculation
-
+Example entries:
 ```javascript
-// Weight by impact on visibility
-const weighted = low * 1.0 +    // Low clouds = total block
-                 mid * 0.7 +    // Mid clouds = partial
-                 high * 0.3;    // High clouds = minor
-const skyScore = 100 - weighted;
+NVDA: { sector: 'Chips', desc: 'AI GPU leader - powering ChatGPT, autonomous cars' }
+TSLA: { sector: 'Auto', desc: 'Electric vehicles, solar, AI robotics - Musk\'s empire' }
+```
+
+### Email Alerts
+
+Sends email alerts when any stock moves **>20%** in a single day:
+- Cooldown: 4 hours per symbol (prevents spam)
+- Only triggers during market hours (9:30 AM - 4:00 PM ET)
+
+---
+
+## 🌌 Aurora Module Decision Logic
+
+### Binary GO / NO GO (No MAYBE!)
+
+The aurora module uses **real-time physics-based** decision making:
+
+1. **Darkness Check**: Sun must be below -6° (civil twilight)
+2. **Bz Field**: Must be southward (negative) - this opens the magnetosphere
+3. **Latitude Reach**: Calculate if aurora can reach user's latitude
+4. **Sky Clarity**: Low clouds < 50% blocking
+
+### Integrated Current Weather
+
+The Aurora page now displays **current weather conditions** to help with viewing decisions:
+
+- **Temperature & Feels Like**: Know what to wear when going outside
+- **Weather Description**: Current conditions (clear, cloudy, rain, snow)
+- **Humidity & Wind**: Environmental factors for comfort
+- **Visibility**: Crucial for aurora viewing
+- **Viewing Tip**: Smart tip based on current conditions (bundling up, rain warning, etc.)
+
+### Why Bz Over Kp?
+
+- **Kp** is a 3-hour lagging average
+- **Bz** is real-time from DSCOVR satellite at L1 point
+- Bz southward = magnetosphere opens = aurora possible
+- Bz northward = magnetosphere closed = no aurora (regardless of Kp)
+
+### G4 Storm Baseline (May 10-11, 2024)
+
+Reference values from the strongest storm in 20+ years:
+```javascript
+{ speed: 750, density: 25, bz: -30, bt: 40, pressure: 15 }
 ```
 
 ---
 
-## Email Alerts
+## 🎨 Frontend Structure
 
-### Real-time GO Alerts
+### CSS Architecture
 
-Triggered when GO conditions detected AND sky is dark:
-- Similarity ≥ 40% AND
-- Bz < -5 nT AND
-- Sun below -6° at alert location (civil twilight or darker) AND
-- Cooldown period elapsed (default 60 min)
+- **styles.css**: Base reset, variables, typography
+- **overwatch.css**: All module-specific styles (~2900 lines)
+- **charts.css**: SVG chart styling
 
-### Daily Summary Email
+### CSS Variables
 
-Sent daily at 8:00 AM PST with yesterday's aurora conditions:
-- Peak G4 similarity and timestamp
-- Min/max/avg for all metrics (speed, density, Bz, Bt)
-- Hours with good Bz conditions (< -5 nT)
-- Overall verdict: EXCELLENT / GOOD / MODERATE / QUIET
-
-**Catch-up on restart**: If server restarts after 8 AM and today's summary hasn't been sent, it sends immediately. State persisted in `.daily-summary-state.json`.
-
-**Configuration** (environment variables):
+```css
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-card: #12121a;
+  --text: #ffffff;
+  --text-dim: #8b8ba3;
+  --accent: #6366f1;
+  --go: #22c55e;
+  --no-go: #ef4444;
+}
 ```
+
+### Mobile-First Design
+
+- Tabs show icons only on mobile (< 640px)
+- Touch-friendly: 48px min tap targets
+- Horizontal scroll for tabs with scroll-snap
+- All touch events use `touch-action: manipulation`
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables (.env)
+
+```env
+# Server
+PORT=8000
+
+# Email Alerts (Optional)
 EMAIL_ENABLED=true
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
+SMTP_USER=your@email.com
 SMTP_PASS=app-specific-password
-FROM_EMAIL=your-email@gmail.com
 EMAIL_RECIPIENTS=user1@email.com,user2@email.com
 EMAIL_COOLDOWN=60
+
+# Alert Location
 ALERT_LATITUDE=47.6
 ALERT_LONGITUDE=-122.3
 ALERT_LOCATION_NAME=Seattle, WA
+
+# Module Toggles
+AURORA_ENABLED=true
+STOCKS_ENABLED=true
+NEWS_ENABLED=true
+
+# Custom Watchlist
+STOCKS_WATCHLIST=MSFT,NVDA,TSLA,META,GOOGL,AAPL,AMD,PLTR,SMCI,ARM
 ```
 
 ---
 
-## Frontend Structure
+## 🧪 Testing
 
-### Desktop Layout (768px+)
-
-```
-┌─────────────────────────────────────────────┐
-│ Header (Title + Live Indicator)              │
-├───────────────┬─────────────────────────────┤
-│ Left Column   │ Right Column                 │
-│ (sticky)      │                              │
-│               │                              │
-│ ┌───────────┐ │ ┌─────────────────────────┐ │
-│ │ GO / NO GO│ │ │ Current Storm (G0-G5)   │ │
-│ └───────────┘ │ ├─────────────────────────┤ │
-│               │ │ Predicted Storm (24h)   │ │
-│ G4 Similarity │ └─────────────────────────┘ │
-│               │                              │
-│ Aurora | Sky  │ Space Weather Metrics       │
-│ factors       │ ┌─────┬─────┬─────┐        │
-│               │ │ Bz  │Speed│Press│        │
-│ Recommendation│ ├─────┼─────┼─────┤        │
-│               │ │Dens │ Bt  │Clock│        │
-│ Cloud Cover   │ ├─────┴─────┴─────┤        │
-│ (Low/Mid/High)│ │ Bz Duration      │        │
-│               │ └─────────────────┘         │
-│               │                              │
-│               │ Viewing Info                 │
-│               │ ┌─────────────────────────┐ │
-│               │ │ NOAA OVATION Forecast   │ │
-│               │ │ (At Location + North)   │ │
-│               │ └─────────────────────────┘ │
-└───────────────┴─────────────────────────────┘
+Run all 59 tests:
+```bash
+npm test
 ```
 
-### Mobile Layout (<768px)
-
-Single column, same components stacked vertically.
+Test structure:
+- **Static Files** (10 tests): HTML, CSS, JS, PWA assets
+- **Aurora APIs** (12 tests): Solar wind, clouds, ovation
+- **Weather APIs** (11 tests): Forecast, conditions
+- **Stocks APIs** (15 tests): Prices, movers, charts
+- **Crypto/News** (4 tests): Price feeds, RSS
+- **Status** (3 tests): Health checks
+- **Security** (7 tests): Error handling, validation
 
 ---
 
-## Development
+## 🚀 Deployment
 
-### Run Locally
+### Azure App Service
 
 ```bash
-npm install
-node server.js
-# Open http://localhost:8000
+# Use the quick-deploy script
+./quick-deploy.sh
+
+# Or manual deployment
+az webapp up --name overwatch --resource-group overwatch-rg --plan overwatch --runtime "NODE|22-lts"
+az webapp config set --name overwatch --resource-group overwatch-rg --always-on true
 ```
 
-### Key Files to Modify
-
-| Change | File(s) |
-|--------|---------|
-| Decision thresholds | `src/js/aurora-tracker.js` → `getDecision()` |
-| Latitude visibility | `src/js/aurora-tracker.js` → `getVisibleLatitude()` |
-| Add new metric | `server.js` + `index.html` + `aurora-tracker.js` |
-| Styling | `src/css/styles.css` |
-| API endpoints | `server.js` |
-| Real-time alerts | `server.js` → `checkAndSendAlerts()` |
-| Daily summary | `server.js` → `sendDailySummaryEmail()` |
+> **Important**: Use Basic tier (B1) or higher for Always On. Free tier sleeps after 20 min.
 
 ---
 
-## Caching
+## 📋 Version Maintenance
 
-| Cache | TTL | Purpose |
-|-------|-----|---------|
-| Solar wind | 2 min | Reduce NOAA API load |
-| Cloud data | 15 min | Weather changes slowly |
-| OVATION forecast | 10 min | Model updates every ~30 min |
-
----
-
-## Error Handling
-
-- API failures return mock/cached data
-- Cloud API failure defaults to clear sky (fail toward GO)
-- Network errors show NO GO with retry button
-- All errors logged to console
-
----
-
-## Testing
-
-```bash
-# Check server
-curl http://localhost:8000/api/solar-wind | jq
-
-# Check clouds
-curl "http://localhost:8000/api/clouds?lat=47.6&lon=-122.3" | jq
-
-# Verify page loads
-open http://localhost:8000
-```
-
----
-
-## Version Maintenance
-
-When releasing a new version, update the version number in ALL these files:
+When releasing a new version, update ALL these files:
 
 | File | Location |
 |------|----------|
 | `package.json` | `"version": "x.x.x"` (source of truth) |
-| `QUICKREF.md` | Title line (this file) |
-| `server.js` | Console log on startup (~line 1088) |
-| `src/js/aurora-tracker.js` | File header comment (line 2) |
-| `src/css/styles.css` | File header comment (line 1) |
+| `QUICKREF.md` | Title line |
+| `server.js` | Startup console log |
+| `src/js/aurora-tracker.js` | Header comment |
+| `src/css/styles.css` | Header comment |
 
-Then run `npm install` to update `package-lock.json`.
+---
+
+## ⚠️ Common Pitfalls
+
+1. **ESLint**: Uses 2-space indentation. Run `npx eslint --fix` before committing.
+2. **ES Modules**: All files use `import/export`. No `require()`.
+3. **CORS**: Server adds `Access-Control-Allow-Origin: *` to all API responses.
+4. **Caching**: External API calls are cached. Check cache TTL before debugging.
+5. **Market Hours**: Stock movers only update during US market hours (9:30-4:00 ET).
+
+---
+
+## 🔗 External Resources
+
+- [NOAA Space Weather](https://www.swpc.noaa.gov/)
+- [Open-Meteo API](https://open-meteo.com/)
+- [CoinGecko API](https://www.coingecko.com/api)
+- [Yahoo Finance](https://finance.yahoo.com/)

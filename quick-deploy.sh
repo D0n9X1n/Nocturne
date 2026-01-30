@@ -33,9 +33,9 @@ else
 fi
 
 # Configuration (from .env or defaults)
-RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-aurora-tracker-rg}"
-APP_NAME="${AZURE_APP_NAME:-aurora-tracker}"
-PLAN_NAME="${AZURE_APP_PLAN:-${APP_NAME}-plan}"
+RESOURCE_GROUP="${AZURE_RESOURCE_GROUP:-overwatch-rg}"
+APP_NAME="${AZURE_APP_NAME:-overwatch}"
+PLAN_NAME="${AZURE_APP_PLAN:-overwatch}"
 LOCATION="${AZURE_LOCATION:-}"
 
 # Location preference: try preferred first, then US-first defaults
@@ -57,11 +57,12 @@ cat << 'EOF'
 
 ████████████████████████████████████████████████████████████
 █                                                          █
-█          🌌 Aurora Tracker - Azure Deploy 🌌          █
+█            👁️ Overwatch - Azure Deploy 👁️            █
+█           24x7 Monitoring Service Platform             █
 █                                                          █
 ████████████████████████████████████████████████████████████
 
-🚀 Deploying Aurora Tracker to Azure...
+🚀 Deploying Overwatch to Azure...
 
 EOF
 
@@ -92,7 +93,7 @@ echo "  Resource Group: $RESOURCE_GROUP"
 echo "  App Name:       $APP_NAME"
 echo "  Location:       $LOCATION_LABEL"
 echo "  Plan Name:      $PLAN_NAME"
-echo "  SKU:            Prefer F1 (Free), fallback B1"
+echo "  SKU:            B1 (Basic - 24x7 Always On)"
 echo ""
 
 echo "📝 Checking Azure authentication..."
@@ -145,7 +146,8 @@ if az appservice plan show --name "$PLAN_NAME" --resource-group "$RESOURCE_GROUP
 else
     set +e
     for TRY_LOCATION in "${LOCATION_CANDIDATES[@]}"; do
-        for TRY_SKU in F1 B1; do
+        # Use B1 (Basic) for 24x7 Always On support - Free tier sleeps after inactivity
+        for TRY_SKU in B1 B2; do
             run_cmd "Create App Service Plan (SKU: ${TRY_SKU}, Location: ${TRY_LOCATION})" az appservice plan create \
                 --name "$PLAN_NAME" \
                 --resource-group "$RESOURCE_GROUP" \
@@ -156,7 +158,7 @@ else
             if [ $RESULT -eq 0 ]; then
                 SKU="$TRY_SKU"
                 LOCATION="$TRY_LOCATION"
-                echo "✅ App Service Plan created (SKU: $SKU)"
+                echo "✅ App Service Plan created (SKU: $SKU - Always On enabled)"
                 break 2
             fi
             echo "⚠️  SKU $TRY_SKU unavailable in $TRY_LOCATION, trying next..."
@@ -165,7 +167,7 @@ else
     done
     set -e
     if [ -z "$SKU" ]; then
-        echo "❌ Failed to create App Service Plan with F1 or B1"
+        echo "❌ Failed to create App Service Plan with B1 or B2"
         exit 1
     fi
 fi
@@ -214,6 +216,16 @@ if ! run_cmd "Set Node.js runtime" az webapp config set \
     echo "❌ Failed to set Node.js runtime"
     exit 1
 fi
+
+# Enable Always On for 24x7 uptime (requires Basic tier or higher)
+echo "   Enabling Always On for 24x7 uptime..."
+if ! run_cmd "Enable Always On" az webapp config set \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$APP_NAME" \
+    --always-on true; then
+    echo "⚠️  Could not enable Always On (may require Basic tier or higher)"
+fi
+
 if ! run_cmd "Configure app settings" az webapp config appsettings set \
     --resource-group "$RESOURCE_GROUP" \
     --name "$APP_NAME" \
@@ -221,7 +233,7 @@ if ! run_cmd "Configure app settings" az webapp config appsettings set \
     echo "❌ Failed to configure app settings"
     exit 1
 fi
-echo "✅ App settings configured"
+echo "✅ App settings configured (Always On enabled)"
 echo ""
 
 echo "6️⃣  Ensuring app is running..."
@@ -231,7 +243,7 @@ echo ""
 
 echo "7️⃣  Preparing and deploying code..."
 echo "   Creating zip package (excluding .git, node_modules, .env)"
-TEMP_ZIP="/tmp/northern-lights-${APP_NAME}.zip"
+TEMP_ZIP="/tmp/overwatch-${APP_NAME}.zip"
 if ! run_cmd "Create deployment package" zip -r "$TEMP_ZIP" . -x ".git/*" "node_modules/*" ".env"; then
     echo "❌ Failed to create deployment package"
     exit 1

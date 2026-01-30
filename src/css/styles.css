@@ -316,6 +316,116 @@ header p { font-size: 0.85em; color: var(--text-dim); margin-top: 2px; }
 .cloud-val { font-size: 0.85em; font-weight: 600; text-align: right; }
 
 /* ============================================
+   TODAY'S WEATHER (Aurora Page)
+   ============================================ */
+.weather-today-section {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.weather-today-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.weather-today-header h3 { font-size: 0.9em; margin: 0; }
+.weather-location { font-size: 0.75em; color: var(--text-dim); }
+
+.weather-today-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.weather-today-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.weather-icon-lg {
+  font-size: 2.5em;
+  line-height: 1;
+}
+
+.weather-temp-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.weather-temp {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.weather-desc {
+  font-size: 0.85em;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.weather-today-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.weather-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+}
+
+.weather-detail .detail-icon {
+  font-size: 0.9em;
+  width: 20px;
+}
+
+.weather-detail .detail-label {
+  font-size: 0.7em;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.weather-detail .detail-val {
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.weather-viewing-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(var(--accent-rgb), 0.1);
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.weather-viewing-tip .tip-icon {
+  font-size: 1.1em;
+}
+
+.weather-viewing-tip .tip-text {
+  font-size: 0.8em;
+  color: var(--text);
+}
+
+/* Light theme weather adjustments */
+[data-theme="light"] .weather-today-section { background: var(--card); }
+[data-theme="light"] .weather-detail { background: rgba(0,0,0,0.03); }
+[data-theme="light"] .weather-viewing-tip { background: rgba(var(--accent-rgb), 0.08); }
+
+/* ============================================
    STORM SCALE
    ============================================ */
 .storm-section {
