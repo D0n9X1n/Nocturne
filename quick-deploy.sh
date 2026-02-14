@@ -235,15 +235,7 @@ if [ -f ".env" ]; then
         "ALERT_LATITUDE"
         "ALERT_LONGITUDE"
         "ALERT_LOCATION_NAME"
-        "STOCKS_ENABLED"
-        "STOCKS_WATCHLIST"
-        "STOCKS_ALERT_THRESHOLD"
-        "ALPHA_VANTAGE_API_KEY"
-        "FINNHUB_API_KEY"
         "NEWS_ENABLED"
-        "NEWSAPI_KEY"
-        "NEWS_CATEGORIES"
-        "NEWS_KEYWORDS"
         "AURORA_ENABLED"
     )
     
@@ -339,7 +331,6 @@ if [ -f ".env" ]; then
     echo "📋 Applied Settings from .env:"
     [ "$EMAIL_ENABLED" = "true" ] && echo "   ✅ Email notifications: ENABLED (${EMAIL_RECIPIENTS:-no recipients})"
     [ "$EMAIL_ENABLED" != "true" ] && echo "   ⚪ Email notifications: DISABLED"
-    [ "$STOCKS_ENABLED" = "true" ] && echo "   ✅ Stocks module: ENABLED"
     [ "$NEWS_ENABLED" = "true" ] && echo "   ✅ News module: ENABLED"
     [ -n "$ALERT_LATITUDE" ] && echo "   📍 Alert location: ${ALERT_LOCATION_NAME:-$ALERT_LATITUDE, $ALERT_LONGITUDE}"
     echo ""
