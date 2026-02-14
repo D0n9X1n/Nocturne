@@ -1,4 +1,4 @@
-# QUICKREF.md - Nocturne v3.1.0
+# QUICKREF.md - Nocturne v3.2.0
 
 > **⚠️ FOR AI AGENTS**: Read this file FIRST before making any changes to this codebase. This contains the complete technical specifications for the Nocturne 24x7 monitoring service.
 
@@ -7,8 +7,8 @@
 ## 🎯 System Overview
 
 **Project Name**: Nocturne  
-**Purpose**: 24x7 personal monitoring assistant with modular trackers  
-**Version**: 3.1.0  
+**Purpose**: 24x7 personal monitoring assistant for aurora and news  
+**Version**: 3.2.0  
 **Node.js**: 18+ (ES Modules)  
 **Deployment**: Azure App Service (Basic B1 for Always On)
 
@@ -16,12 +16,8 @@
 
 | Module | Description | Data Source |
 |--------|-------------|-------------|
-| Dashboard | At-a-glance overview of all services | All APIs |
 | Aurora | Real-time aurora visibility + current weather | NOAA DSCOVR/ACE, Open-Meteo |
-| Crypto | Top cryptocurrency prices & market stats | CoinGecko |
-| Stocks | Stock watchlist + US market movers | Yahoo Finance |
-| News | Breaking news from RSS feeds | BBC, NPR, CNBC, etc. |
-| Settings | Theme, watchlist, location config | Local storage |
+| News | Breaking news from RSS feeds + built-in reader | BBC, NPR, CNBC, etc. |
 
 > **Note**: Weather data is integrated into the Aurora page for viewing conditions. No separate Weather tab.
 
@@ -38,6 +34,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                     server.js (Node.js)                      │
 │  - API proxy with caching                                    │
+│  - Article content extraction (reader)                       │
 │  - Static file serving                                       │
 │  - Email alerts (optional)                                   │
 │  - Daily summary emails (optional)                           │
@@ -45,7 +42,7 @@
                               ↑ HTTPS
 ┌─────────────────────────────────────────────────────────────┐
 │                    External APIs (FREE)                      │
-│  NOAA, Open-Meteo, CoinGecko, Yahoo Finance, RSS Feeds      │
+│  NOAA, Open-Meteo, RSS Feeds                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -55,7 +52,7 @@
 
 ```
 nocturne/
-├── server.js                    # Backend: ~2100 lines, all API routes
+├── server.js                    # Backend: all API routes
 ├── package.json                 # Dependencies (minimal: dotenv only)
 ├── .env                         # Optional config (email, alerts)
 ├── .eslintrc.json               # ESLint config (2-space indent)
@@ -67,19 +64,15 @@ nocturne/
 │   ├── index.html               # Main SPA entry point
 │   ├── css/
 │   │   ├── styles.css           # Base/reset styles
-│   │   ├── nocturne.css         # Module styles (~2900 lines)
+│   │   ├── nocturne.css         # Module styles
 │   │   └── charts.css           # Chart component styles
 │   ├── js/
 │   │   ├── nocturne.js          # Main controller & router
 │   │   ├── aurora.js            # Aurora decision logic
 │   │   └── charts.js            # SVG chart library
 │   └── modules/
-│       ├── dashboard/dashboard.js
 │       ├── aurora/aurora.js     # Includes current weather display
-│       ├── crypto/crypto.js
-│       ├── stocks/stocks.js     # ~1050 lines, company DB
-│       ├── news/news.js
-│       └── settings/settings.js
+│       └── news/news.js         # Includes built-in article reader
 │
 ├── public/
 │   ├── manifest.json            # PWA manifest
@@ -87,7 +80,7 @@ nocturne/
 │   └── sw.js                    # Service worker
 │
 └── tests/
-    └── server.test.js           # 59 tests (Node.js test runner)
+    └── server.test.js           # 45 tests (Node.js test runner)
 ```
 
 ---
@@ -103,61 +96,48 @@ nocturne/
 | `GET /api/ovation?lat=&lon=` | NOAA aurora probability | 10 min |
 | `GET /api/aurora/status` | Combined aurora GO/NO GO status | 2 min |
 
-### Market APIs
+### News APIs
 
 | Endpoint | Description | Cache |
 |----------|-------------|-------|
-| `GET /api/stocks/prices` | Watchlist stocks + indices | 1 min |
-| `GET /api/stocks/market-status` | NYSE open/close status | 1 min |
-| `GET /api/stocks/nasdaq-movers` | Top 10 US market movers | 10 min |
-| `GET /api/stocks/chart?symbol=&range=` | Stock price chart data | 5 min |
-| `GET /api/crypto/prices` | Top 10 crypto prices | 2 min |
+| `GET /api/news/headlines` | Aggregated RSS news | 5 min |
+| `GET /api/news/breaking` | Recent breaking articles | 5 min |
+| `GET /api/news/read?url=` | Extract article content for reader | 30 min |
 
 ### Other APIs
 
 | Endpoint | Description | Cache |
 |----------|-------------|-------|
 | `GET /api/weather/forecast?lat=&lon=` | Full weather forecast | 15 min |
-| `GET /api/news/headlines` | Aggregated RSS news | 5 min |
 | `GET /api/status` | Server health & module status | None |
 
 ---
 
-## 📊 Stocks Module Details
+## 📰 News Reader
 
-### US Market Movers
+The news module includes a **built-in article reader** that extracts content server-side:
 
-Fetches **top 10 gainers and losers** from ALL US exchanges:
-- NYSE (NYQ, NYS)
-- NASDAQ (NMS, NGM, NCM, NIM)
-- AMEX (ASE)
-- NYSE ARCA (PCX)
+- Click any headline → opens a dark, clean reading overlay
+- Server fetches the article HTML and extracts: title, author, date, hero image, paragraphs
+- Filters out ads, navigation, scripts, and junk content
+- Shows estimated read time based on word count
+- Fallback link to original article if extraction fails
+- Close with ✕ button, Escape key, or clicking outside the panel
 
-### Watchlist (Default)
+### Reader API (`/api/news/read?url=...`)
 
-Big Tech + AI Leaders:
-```javascript
-['MSFT', 'NVDA', 'TSLA', 'META', 'GOOGL', 'AAPL', 'AMD', 'PLTR', 'SMCI', 'ARM']
+Returns:
+```json
+{
+  "title": "Article Title",
+  "author": "Author Name",
+  "publishedAt": "2024-01-15T...",
+  "image": "https://...",
+  "paragraphs": ["First paragraph...", "Second paragraph..."],
+  "sourceUrl": "https://original-url",
+  "wordCount": 842
+}
 ```
-
-### Company Info Database
-
-The stocks module includes a built-in company database (`COMPANY_INFO`) with:
-- **90+ companies** with sector tags and brief descriptions
-- Used to provide context for market movers
-- Shows sector badge and company description on mover cards
-
-Example entries:
-```javascript
-NVDA: { sector: 'Chips', desc: 'AI GPU leader - powering ChatGPT, autonomous cars' }
-TSLA: { sector: 'Auto', desc: 'Electric vehicles, solar, AI robotics - Musk\'s empire' }
-```
-
-### Email Alerts
-
-Sends email alerts when any stock moves **>20%** in a single day:
-- Cooldown: 4 hours per symbol (prevents spam)
-- Only triggers during market hours (9:30 AM - 4:00 PM ET)
 
 ---
 
@@ -174,7 +154,7 @@ The aurora module uses **real-time physics-based** decision making:
 
 ### Integrated Current Weather
 
-The Aurora page now displays **current weather conditions** to help with viewing decisions:
+The Aurora page displays **current weather conditions** to help with viewing decisions:
 
 - **Temperature & Feels Like**: Know what to wear when going outside
 - **Weather Description**: Current conditions (clear, cloudy, rain, snow)
@@ -203,7 +183,7 @@ Reference values from the strongest storm in 20+ years:
 ### CSS Architecture
 
 - **styles.css**: Base reset, variables, typography
-- **nocturne.css**: All module-specific styles (~2900 lines)
+- **nocturne.css**: All module-specific styles + reader overlay
 - **charts.css**: SVG chart styling
 
 ### CSS Variables
@@ -253,18 +233,14 @@ ALERT_LOCATION_NAME=Seattle, WA
 
 # Module Toggles
 AURORA_ENABLED=true
-STOCKS_ENABLED=true
 NEWS_ENABLED=true
-
-# Custom Watchlist
-STOCKS_WATCHLIST=MSFT,NVDA,TSLA,META,GOOGL,AAPL,AMD,PLTR,SMCI,ARM
 ```
 
 ---
 
 ## 🧪 Testing
 
-Run all 59 tests:
+Run all 45 tests:
 ```bash
 npm test
 ```
@@ -273,8 +249,7 @@ Test structure:
 - **Static Files** (10 tests): HTML, CSS, JS, PWA assets
 - **Aurora APIs** (12 tests): Solar wind, clouds, ovation
 - **Weather APIs** (11 tests): Forecast, conditions
-- **Stocks APIs** (15 tests): Prices, movers, charts
-- **Crypto/News** (4 tests): Price feeds, RSS
+- **News APIs** (2 tests): Headlines, articles
 - **Status** (3 tests): Health checks
 - **Security** (7 tests): Error handling, validation
 
@@ -317,7 +292,6 @@ When releasing a new version, update ALL these files:
 2. **ES Modules**: All files use `import/export`. No `require()`.
 3. **CORS**: Server adds `Access-Control-Allow-Origin: *` to all API responses.
 4. **Caching**: External API calls are cached. Check cache TTL before debugging.
-5. **Market Hours**: Stock movers only update during US market hours (9:30-4:00 ET).
 
 ---
 
@@ -325,5 +299,3 @@ When releasing a new version, update ALL these files:
 
 - [NOAA Space Weather](https://www.swpc.noaa.gov/)
 - [Open-Meteo API](https://open-meteo.com/)
-- [CoinGecko API](https://www.coingecko.com/api)
-- [Yahoo Finance](https://finance.yahoo.com/)

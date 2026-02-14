@@ -1178,7 +1178,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/status') {
     const status = {
       service: 'Nocturne',
-      version: '3.1.0',
+      version: '3.2.0',
       uptime: process.uptime(),
       modules: {
         aurora: MODULES_ENABLED.aurora,
@@ -1594,7 +1594,7 @@ async function getWeatherForecast(lat, lon) {
 // Start Server - Nocturne 24x7 Personal Assistant
 // ============================================================================
 server.listen(PORT, () => {
-  console.log('\n🌙 Nocturne v3.1.0 - Your 24x7 Personal Assistant');
+  console.log('\n🌙 Nocturne v3.2.0 - Your 24x7 Personal Assistant');
   console.log(`📡 http://localhost:${PORT}\n`);
   
   console.log('Enabled Modules:');
