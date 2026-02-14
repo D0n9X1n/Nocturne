@@ -62,14 +62,13 @@ async function fetchBreaking() {
 function renderNewsCard(article) {
   const timeAgo = getTimeAgo(new Date(article.publishedAt));
   const isBreaking = article.isBreaking;
+  const encodedUrl = encodeURIComponent(article.url);
   
   return `
-    <article class="news-card ${isBreaking ? 'breaking' : ''}">
+    <article class="news-card ${isBreaking ? 'breaking' : ''}" onclick="window.nocturneModules?.news?.openReader?.('${encodedUrl}', '${article.source || 'Unknown'}')">
       ${isBreaking ? '<span class="breaking-badge">🔴 BREAKING</span>' : ''}
       <div class="news-source">${article.source || 'Unknown'}</div>
-      <h3 class="news-title">
-        <a href="${article.url}" target="_blank" rel="noopener">${article.title}</a>
-      </h3>
+      <h3 class="news-title">${article.title}</h3>
       <p class="news-description">${article.description || ''}</p>
       <div class="news-meta">
         <span class="news-time">${timeAgo}</span>
@@ -94,9 +93,14 @@ function updateUI() {
   
   if (!newsData || !newsData.articles || newsData.articles.length === 0) {
     container.innerHTML = `
-      <div class="news-empty">
-        <p>📰 Loading news from RSS feeds...</p>
-        <p class="hint">Fetching from BBC, NPR, TechCrunch, and more</p>
+      <div class="news-loading-state">
+        <div class="news-loader">
+          <span class="news-loader-dot"></span>
+          <span class="news-loader-dot"></span>
+          <span class="news-loader-dot"></span>
+        </div>
+        <p class="news-loading-text">Loading news from RSS feeds...</p>
+        <p class="news-loading-hint">Fetching from BBC, NPR, TechCrunch, and more</p>
       </div>
     `;
     return;
@@ -174,6 +178,110 @@ async function refresh() {
 }
 
 // =============================================================================
+// Article Reader
+// =============================================================================
+async function openReader(encodedUrl, source) {
+  const articleUrl = decodeURIComponent(encodedUrl);
+
+  // Create reader overlay if it doesn't exist
+  let overlay = document.getElementById('news-reader-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'news-reader-overlay';
+    overlay.className = 'reader-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  // Show loading state
+  overlay.innerHTML = `
+    <div class="reader-panel">
+      <div class="reader-toolbar">
+        <button class="reader-close" onclick="window.nocturneModules?.news?.closeReader?.()">✕</button>
+        <span class="reader-source">${source}</span>
+        <a class="reader-open-link" href="${articleUrl}" target="_blank" rel="noopener">Open original ↗</a>
+      </div>
+      <div class="reader-body">
+        <div class="reader-loading">
+          <div class="news-loader">
+            <span class="news-loader-dot"></span>
+            <span class="news-loader-dot"></span>
+            <span class="news-loader-dot"></span>
+          </div>
+          <p>Extracting article...</p>
+        </div>
+      </div>
+    </div>
+  `;
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  // Close on overlay background click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeReader();
+  });
+
+  // Close on Escape
+  const escHandler = (e) => { if (e.key === 'Escape') closeReader(); };
+  document.addEventListener('keydown', escHandler);
+  overlay._escHandler = escHandler;
+
+  try {
+    const res = await fetch(`/api/news/read?url=${encodedUrl}`);
+    const data = await res.json();
+
+    const readerBody = overlay.querySelector('.reader-body');
+
+    if (!data.paragraphs || data.paragraphs.length === 0) {
+      readerBody.innerHTML = `
+        <div class="reader-empty">
+          <p>Could not extract article content.</p>
+          <a href="${articleUrl}" target="_blank" rel="noopener" class="reader-fallback-link">Open original article ↗</a>
+        </div>
+      `;
+      return;
+    }
+
+    const readTime = Math.max(1, Math.ceil(data.wordCount / 200));
+
+    readerBody.innerHTML = `
+      ${data.image ? `<div class="reader-hero"><img src="${data.image}" alt="" loading="lazy"></div>` : ''}
+      <h1 class="reader-title">${data.title || 'Untitled'}</h1>
+      <div class="reader-meta">
+        ${data.author ? `<span class="reader-author">By ${data.author}</span>` : ''}
+        ${data.publishedAt ? `<span class="reader-date">${new Date(data.publishedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>` : ''}
+        <span class="reader-read-time">${readTime} min read</span>
+      </div>
+      <div class="reader-content">
+        ${data.paragraphs.map(p => `<p>${p}</p>`).join('')}
+      </div>
+      <div class="reader-footer">
+        <a href="${articleUrl}" target="_blank" rel="noopener">Read on ${source} ↗</a>
+      </div>
+    `;
+  } catch (err) {
+    const readerBody = overlay.querySelector('.reader-body');
+    readerBody.innerHTML = `
+      <div class="reader-empty">
+        <p>Failed to load article.</p>
+        <a href="${articleUrl}" target="_blank" rel="noopener" class="reader-fallback-link">Open original article ↗</a>
+      </div>
+    `;
+  }
+}
+
+function closeReader() {
+  const overlay = document.getElementById('news-reader-overlay');
+  if (overlay) {
+    if (overlay._escHandler) {
+      document.removeEventListener('keydown', overlay._escHandler);
+    }
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+    setTimeout(() => overlay.remove(), 300);
+  }
+}
+
+// =============================================================================
 // Module Lifecycle
 // =============================================================================
 export function init(container) {
@@ -187,9 +295,13 @@ export function init(container) {
         <p class="module-subtitle">Stay informed with real-time headlines</p>
       </div>
       <div id="news-container" class="news-container">
-        <div class="loading-spinner">
-          <div class="spinner"></div>
-          <p>Loading headlines...</p>
+        <div class="news-loading-state">
+          <div class="news-loader">
+            <span class="news-loader-dot"></span>
+            <span class="news-loader-dot"></span>
+            <span class="news-loader-dot"></span>
+          </div>
+          <p class="news-loading-text">Loading headlines...</p>
         </div>
       </div>
     </div>
@@ -203,11 +315,12 @@ export function init(container) {
   
   // Expose refresh function globally for UI button
   if (!window.nocturneModules) window.nocturneModules = {};
-  window.nocturneModules.news = { refresh };
+  window.nocturneModules.news = { refresh, openReader, closeReader };
 }
 
 export function destroy() {
   console.log('[News] Destroying module...');
+  closeReader();
   if (refreshInterval) {
     clearInterval(refreshInterval);
     refreshInterval = null;

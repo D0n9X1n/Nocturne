@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#00d4ff">
-  <meta name="description" content="Nocturne - Your 24x7 Personal Assistant for Northern Lights, Weather, Crypto, Stocks, and News">
+  <meta name="description" content="Nocturne - Your 24x7 Personal Assistant for Northern Lights, Weather, and News">
   
   <title>Nocturne - 24x7 Personal Assistant</title>
   
@@ -22,8 +22,6 @@
   
   <!-- Preconnect to APIs -->
   <link rel="preconnect" href="https://api.open-meteo.com">
-  <link rel="preconnect" href="https://api.coingecko.com">
-  <link rel="preconnect" href="https://query1.finance.yahoo.com">
 </head>
 <body>
   <div class="nocturne-app">
@@ -45,35 +43,15 @@
 
     <!-- Module Tabs -->
     <nav class="module-tabs" id="module-tabs">
-      <button class="tab-btn active" data-module="dashboard">
-        <span class="tab-icon">📊</span>
-        <span class="tab-name">Dashboard</span>
-        <span class="tab-status" id="dashboard-tab-status"></span>
-      </button>
-      <button class="tab-btn" data-module="aurora">
+      <button class="tab-btn active" data-module="aurora">
         <span class="tab-icon">🌌</span>
         <span class="tab-name">Aurora</span>
         <span class="tab-status" id="aurora-tab-status"></span>
-      </button>
-      <button class="tab-btn" data-module="crypto">
-        <span class="tab-icon">💰</span>
-        <span class="tab-name">Crypto</span>
-        <span class="tab-status" id="crypto-tab-status"></span>
-      </button>
-      <button class="tab-btn" data-module="stocks">
-        <span class="tab-icon">📈</span>
-        <span class="tab-name">Stocks</span>
-        <span class="tab-status" id="stocks-tab-status"></span>
       </button>
       <button class="tab-btn" data-module="news">
         <span class="tab-icon">📰</span>
         <span class="tab-name">News</span>
         <span class="tab-status" id="news-tab-status"></span>
-      </button>
-      <button class="tab-btn" data-module="settings">
-        <span class="tab-icon">⚙️</span>
-        <span class="tab-name">Settings</span>
-        <span class="tab-status" id="settings-tab-status"></span>
       </button>
     </nav>
 
@@ -81,12 +59,12 @@
     <main class="module-container" id="module-container">
       
       <!-- Dashboard Module (Default) -->
-      <div class="module-panel active" id="panel-dashboard">
+      <div class="module-panel" id="panel-dashboard">
         <!-- Loaded dynamically -->
       </div>
 
       <!-- Aurora Module -->
-      <div class="module-panel" id="panel-aurora">
+      <div class="module-panel active" id="panel-aurora">
         <!-- Aurora tracker content will be loaded here -->
         <div class="app">
           
@@ -497,23 +475,8 @@
         </div>
       </div>
 
-      <!-- Crypto Module -->
-      <div class="module-panel" id="panel-crypto">
-        <!-- Loaded dynamically -->
-      </div>
-
-      <!-- Stocks Module -->
-      <div class="module-panel" id="panel-stocks">
-        <!-- Loaded dynamically -->
-      </div>
-
       <!-- News Module -->
       <div class="module-panel" id="panel-news">
-        <!-- Loaded dynamically -->
-      </div>
-
-      <!-- Settings Module -->
-      <div class="module-panel" id="panel-settings">
         <!-- Loaded dynamically -->
       </div>
 

@@ -20,7 +20,6 @@ const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 // Module Enable Flags
 const MODULES_ENABLED = {
   aurora: process.env.AURORA_ENABLED !== 'false', // Default enabled
-  stocks: process.env.STOCKS_ENABLED === 'true',
   news: process.env.NEWS_ENABLED === 'true'
 };
 
@@ -38,15 +37,6 @@ const EMAIL_CONFIG = {
   alertLatitude: parseFloat(process.env.ALERT_LATITUDE || '47.6'),
   alertLongitude: parseFloat(process.env.ALERT_LONGITUDE || '-122.3'),
   alertLocationName: process.env.ALERT_LOCATION_NAME || 'Seattle, WA'
-};
-
-// Stock Module Configuration - Big Tech + AI Leaders
-const STOCKS_CONFIG = {
-  enabled: MODULES_ENABLED.stocks,
-  watchlist: (process.env.STOCKS_WATCHLIST || 'MSFT,NVDA,TSLA,META,GOOGL,AAPL,AMD,PLTR,SMCI,ARM').split(',').filter(s => s.trim()),
-  alertThreshold: parseFloat(process.env.STOCKS_ALERT_THRESHOLD || '5'),
-  alphaVantageKey: process.env.ALPHA_VANTAGE_API_KEY || '',
-  finnhubKey: process.env.FINNHUB_API_KEY || ''
 };
 
 // News Module Configuration
@@ -1136,87 +1126,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ==========================================
-  // CRYPTO MODULE APIs
-  // ==========================================
-  
-  if (url.pathname === '/api/crypto/prices') {
-    try {
-      const cryptoData = await getCryptoPrices();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(cryptoData));
-    } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error.message }));
-    }
-    return;
-  }
-
-  // ==========================================
-  // STOCKS MODULE APIs
-  // ==========================================
-  
-  if (url.pathname === '/api/stocks/prices') {
-    try {
-      // Accept custom symbols from query param, otherwise use default watchlist
-      const symbolsParam = url.searchParams.get('symbols');
-      const customSymbols = symbolsParam ? symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : null;
-      const stocksData = await getStockPrices(customSymbols);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(stocksData));
-    } catch (error) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ stocks: [], error: error.message }));
-    }
-    return;
-  }
-
-  if (url.pathname === '/api/stocks/market-status') {
-    try {
-      const status = getMarketStatus();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(status));
-    } catch (error) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ isOpen: false, error: error.message }));
-    }
-    return;
-  }
-
-  if (url.pathname === '/api/stocks/nasdaq-movers') {
-    try {
-      const movers = await fetchNasdaqMovers();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(movers));
-    } catch (error) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ gainers: [], losers: [], error: error.message }));
-    }
-    return;
-  }
-
-  // API: Stock Chart Data (for trend modal)
-  if (url.pathname === '/api/stocks/chart') {
-    try {
-      const symbol = url.searchParams.get('symbol');
-      const range = url.searchParams.get('range') || '1d';
-      
-      if (!symbol) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Symbol is required' }));
-        return;
-      }
-      
-      const chartData = await fetchStockChart(symbol, range);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(chartData));
-    } catch (error) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error.message }));
-    }
-    return;
-  }
-
-  // ==========================================
   // NEWS MODULE APIs
   // ==========================================
   
@@ -1244,6 +1153,24 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/news/read') {
+    try {
+      const articleUrl = url.searchParams.get('url');
+      if (!articleUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'URL parameter is required' }));
+        return;
+      }
+      const article = await fetchArticleContent(articleUrl);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(article));
+    } catch (error) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message, content: null }));
+    }
+    return;
+  }
+
   // ==========================================
   // NOCTURNE STATUS API
   // ==========================================
@@ -1255,7 +1182,6 @@ const server = http.createServer(async (req, res) => {
       uptime: process.uptime(),
       modules: {
         aurora: MODULES_ENABLED.aurora,
-        stocks: MODULES_ENABLED.stocks,
         news: MODULES_ENABLED.news
       },
       email: EMAIL_CONFIG.enabled
@@ -1298,549 +1224,6 @@ const server = http.createServer(async (req, res) => {
 
   serveFile(filePath, res);
 });
-
-// ============================================================================
-// STOCKS MODULE - Stock Price Fetching (Using Yahoo Finance - Free, No API Key)
-// ============================================================================
-const stocksCache = { data: null, time: 0 };
-const nasdaqMoversCache = { data: null, time: 0 };
-const STOCKS_CACHE_DURATION = 60 * 1000; // 1 minute
-const NASDAQ_MOVERS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-// Track alerted stocks to avoid spam (symbol -> timestamp of last alert)
-const stockAlertHistory = new Map();
-const STOCK_ALERT_COOLDOWN = 2 * 60 * 60 * 1000; // 2 hours cooldown per stock
-const EXTREME_MOVE_THRESHOLD = 20; // Alert for >20% moves
-
-/**
- * Fetch stock data from Yahoo Finance (free, no API key required)
- */
-async function fetchYahooQuote(symbol, includeSparkline = false) {
-  try {
-    // Yahoo Finance API v8 - free and public
-    // Use 5d range with 15m intervals for sparkline data
-    const range = includeSparkline ? '5d' : '1d';
-    const interval = includeSparkline ? '15m' : '1d';
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}`;
-    const data = await fetchJSON(url);
-    
-    if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-      throw new Error('No data returned');
-    }
-    
-    const result = data.chart.result[0];
-    const meta = result.meta;
-    const quote = result.indicators?.quote?.[0];
-    
-    const currentPrice = meta.regularMarketPrice || 0;
-    // Always use previousClose (yesterday's close) for daily change, not chartPreviousClose (varies by range)
-    const previousClose = meta.previousClose || meta.chartPreviousClose || 0;
-    const change = currentPrice - previousClose;
-    const changePercent = previousClose ? (change / previousClose) * 100 : 0;
-    
-    // Build sparkline from close prices (last 20 points)
-    let sparkline = [];
-    if (includeSparkline && quote?.close) {
-      sparkline = quote.close.filter(v => v !== null && v !== undefined).slice(-30);
-    }
-    
-    return {
-      symbol: meta.symbol,
-      name: meta.shortName || meta.symbol,
-      price: currentPrice,
-      change: change,
-      changePercent: changePercent,
-      high: meta.regularMarketDayHigh || quote?.high?.[0],
-      low: meta.regularMarketDayLow || quote?.low?.[0],
-      open: quote?.open?.[0],
-      previousClose: previousClose,
-      volume: meta.regularMarketVolume,
-      marketCap: meta.marketCap,
-      sparkline: sparkline
-    };
-  } catch (e) {
-    console.error(`[Stocks] Yahoo fetch error for ${symbol}:`, e.message);
-    return { symbol, error: e.message };
-  }
-}
-
-/**
- * Fetch stock chart data for trend visualization
- */
-async function fetchStockChart(symbol, range = '1d') {
-  try {
-    // Map range to Yahoo Finance parameters
-    const rangeConfig = {
-      '1d': { range: '1d', interval: '5m' },
-      '5d': { range: '5d', interval: '15m' },
-      '1m': { range: '1mo', interval: '1h' },
-      '3m': { range: '3mo', interval: '1d' },
-      '6m': { range: '6mo', interval: '1d' },
-      '1y': { range: '1y', interval: '1d' },
-      'ytd': { range: 'ytd', interval: '1d' }
-    };
-    
-    const config = rangeConfig[range] || rangeConfig['1d'];
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${config.interval}&range=${config.range}`;
-    const data = await fetchJSON(url);
-    
-    if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-      throw new Error('No chart data returned');
-    }
-    
-    const result = data.chart.result[0];
-    const meta = result.meta;
-    const timestamps = result.timestamp || [];
-    const quote = result.indicators?.quote?.[0] || {};
-    
-    // Build OHLCV data points
-    const dataPoints = timestamps.map((ts, i) => ({
-      time: ts * 1000, // Convert to milliseconds
-      open: quote.open?.[i],
-      high: quote.high?.[i],
-      low: quote.low?.[i],
-      close: quote.close?.[i],
-      volume: quote.volume?.[i]
-    })).filter(p => p.close !== null && p.close !== undefined);
-    
-    return {
-      symbol: meta.symbol,
-      name: meta.shortName || meta.symbol,
-      currentPrice: meta.regularMarketPrice,
-      previousClose: meta.chartPreviousClose || meta.previousClose,
-      change: meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose || 0),
-      changePercent: ((meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose || 0)) / (meta.chartPreviousClose || meta.previousClose || 1)) * 100,
-      range: range,
-      dataPoints: dataPoints,
-      lastUpdate: new Date().toISOString()
-    };
-  } catch (e) {
-    console.error(`[Stocks] Chart fetch error for ${symbol}:`, e.message);
-    return { symbol, error: e.message };
-  }
-}
-
-/**
- * Fetch major market indices
- */
-async function fetchMarketIndices() {
-  const indices = [
-    { symbol: '^GSPC', name: 'S&P 500' },
-    { symbol: '^IXIC', name: 'NASDAQ' },
-    { symbol: '^DJI', name: 'DOW' }
-  ];
-  
-  const results = [];
-  for (const idx of indices) {
-    try {
-      const data = await fetchYahooQuote(idx.symbol, false);
-      results.push({
-        symbol: idx.symbol,
-        name: idx.name,
-        price: data.price,
-        change: data.change,
-        changePercent: data.changePercent
-      });
-    } catch (e) {
-      results.push({ symbol: idx.name, value: null, error: e.message });
-    }
-  }
-  return results;
-}
-
-async function getStockPrices(customSymbols = null) {
-  // Use custom symbols if provided, otherwise use server default watchlist
-  const symbols = customSymbols || STOCKS_CONFIG.watchlist;
-  const cacheKey = symbols.sort().join(',');
-  
-  // Return cached if fresh and same symbols
-  if (stocksCache.data && stocksCache.cacheKey === cacheKey && Date.now() - stocksCache.time < STOCKS_CACHE_DURATION) {
-    return stocksCache.data;
-  }
-  
-  if (!STOCKS_CONFIG.enabled || symbols.length === 0) {
-    return { stocks: [], indices: [], message: 'Stock module not configured' };
-  }
-  
-  try {
-    console.log(`[Stocks] Fetching ${symbols.length} stocks from Yahoo Finance...`);
-    const stocks = [];
-    
-    // Fetch each stock from watchlist (with sparkline data)
-    for (const symbol of symbols) {
-      const data = await fetchYahooQuote(symbol, true);
-      stocks.push(data);
-      // Small delay to be nice to Yahoo's servers
-      await new Promise(r => setTimeout(r, 100));
-    }
-    
-    // Fetch major indices
-    const indices = await fetchMarketIndices();
-    
-    const result = {
-      stocks,
-      indices,
-      lastUpdate: new Date().toISOString()
-    };
-    
-    stocksCache.data = result;
-    stocksCache.time = Date.now();
-    stocksCache.cacheKey = cacheKey;
-    
-    console.log(`[Stocks] ✅ Fetched ${stocks.length} stocks, ${indices.length} indices`);
-    
-    // Check for alerts
-    checkStockAlerts(stocks);
-    
-    return result;
-  } catch (error) {
-    console.error('[Stocks] Error:', error.message);
-    return { stocks: [], indices: [], error: error.message };
-  }
-}
-
-function getMarketStatus() {
-  const now = new Date();
-  const nyTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = nyTime.getDay();
-  const hour = nyTime.getHours();
-  const minute = nyTime.getMinutes();
-  const time = hour * 60 + minute;
-  
-  // Market hours: Mon-Fri 9:30 AM - 4:00 PM ET
-  const marketOpen = 9 * 60 + 30;  // 9:30 AM
-  const marketClose = 16 * 60;      // 4:00 PM
-  
-  const isWeekday = day >= 1 && day <= 5;
-  const isMarketHours = time >= marketOpen && time < marketClose;
-  const isOpen = isWeekday && isMarketHours;
-  
-  let nextOpen = null;
-  if (!isOpen) {
-    // Calculate next market open
-    const nextDate = new Date(nyTime);
-    if (day === 0) nextDate.setDate(nextDate.getDate() + 1); // Sunday -> Monday
-    else if (day === 6) nextDate.setDate(nextDate.getDate() + 2); // Saturday -> Monday
-    else if (time >= marketClose) nextDate.setDate(nextDate.getDate() + 1); // After close
-    nextDate.setHours(9, 30, 0, 0);
-    nextOpen = nextDate.toISOString();
-  }
-  
-  return {
-    isOpen,
-    currentTime: nyTime.toISOString(),
-    nextOpen,
-    timezone: 'America/New_York'
-  };
-}
-
-function checkStockAlerts(stocks) {
-  // Only send alerts for extreme movers (>20%)
-  // Regular stock alerts disabled - use NASDAQ extreme movers check instead
-  if (!EMAIL_CONFIG.enabled) return;
-  
-  const extremeMovers = stocks.filter(s => 
-    s.changePercent && Math.abs(s.changePercent) >= 20
-  );
-  
-  if (extremeMovers.length === 0) return;
-  
-  // Check cooldown for each stock
-  const now = Date.now();
-  const newAlerts = extremeMovers.filter(s => {
-    const lastAlerted = stockAlertHistory.get(s.symbol);
-    if (lastAlerted && now - lastAlerted < STOCK_ALERT_COOLDOWN) {
-      return false;
-    }
-    return true;
-  });
-  
-  if (newAlerts.length === 0) return;
-  
-  // Mark stocks as alerted
-  newAlerts.forEach(s => stockAlertHistory.set(s.symbol, now));
-  
-  const subject = `🚨 EXTREME ALERT: ${newAlerts.length} watchlist stock(s) moved >20%!`;
-  const moversHtml = newAlerts.map(s => `
-    <div style="padding: 12px; background: ${s.changePercent >= 0 ? '#1a3d1a' : '#3d1a1a'}; border-radius: 8px; margin: 8px 0; border-left: 4px solid ${s.changePercent >= 0 ? '#4ade80' : '#f87171'};">
-      <div style="font-size: 18px; font-weight: bold;">
-        ${s.symbol} 
-        <span style="color: ${s.changePercent >= 0 ? '#4ade80' : '#f87171'}; font-size: 24px;">
-          ${s.changePercent >= 0 ? '🚀' : '📉'} ${s.changePercent >= 0 ? '+' : ''}${s.changePercent?.toFixed(2)}%
-        </span>
-      </div>
-      <div style="color: #aaa; font-size: 14px; margin-top: 4px;">${s.name || s.symbol}</div>
-      <div style="margin-top: 8px;">Price: <strong>$${s.price?.toFixed(2)}</strong></div>
-    </div>
-  `).join('');
-  
-  const body = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #fff; padding: 24px; max-width: 600px;">
-      <h1 style="color: #ff6b6b; margin-bottom: 8px;">🚨 Extreme Watchlist Alert</h1>
-      <p style="color: #aaa; margin-bottom: 24px;">
-        The following stocks from your watchlist moved more than <strong style="color: #fff;">20%</strong>:
-      </p>
-      ${moversHtml}
-      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #333;">
-        <p style="color: #666; font-size: 12px;">
-          Sent by Nocturne 24x7 Monitoring Service
-        </p>
-      </div>
-    </div>
-  `;
-  
-  sendEmail(subject, body);
-}
-
-// ============================================================================
-// US MARKET TOP MOVERS - Fetch top gainers/losers from all US exchanges
-// ============================================================================
-
-/**
- * Fetch top gainers and losers from all US markets (NYSE, NASDAQ, AMEX)
- * Returns top 10 movers from the entire US market
- */
-async function fetchNasdaqMovers() {
-  // Return cached if fresh
-  if (nasdaqMoversCache.data && Date.now() - nasdaqMoversCache.time < NASDAQ_MOVERS_CACHE_DURATION) {
-    return nasdaqMoversCache.data;
-  }
-  
-  try {
-    console.log('[US Markets] Fetching top movers...');
-    
-    // Yahoo Finance screener for all US market gainers/losers
-    // day_gainers and day_losers include NYSE, NASDAQ, and AMEX
-    const gainersUrl = 'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?scrIds=day_gainers&count=50';
-    const losersUrl = 'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?scrIds=day_losers&count=50';
-    
-    let gainers = [];
-    let losers = [];
-    
-    // US Exchange codes: NMS/NGM/NCM (NASDAQ), NYQ (NYSE), ASE (AMEX), PCX (NYSE Arca)
-    const usExchanges = ['NMS', 'NGM', 'NCM', 'NYQ', 'ASE', 'PCX', 'NIM', 'NYS'];
-    
-    // Fetch gainers
-    try {
-      const gainersData = await fetchJSON(gainersUrl);
-      const quotes = gainersData?.finance?.result?.[0]?.quotes || [];
-      gainers = quotes
-        .filter(q => usExchanges.includes(q.exchange))
-        .map(q => ({
-          symbol: q.symbol,
-          name: q.shortName || q.longName || q.symbol,
-          price: q.regularMarketPrice,
-          change: q.regularMarketChange,
-          changePercent: q.regularMarketChangePercent,
-          volume: q.regularMarketVolume,
-          marketCap: q.marketCap,
-          exchange: getExchangeName(q.exchange)
-        }))
-        .slice(0, 10); // Top 10 gainers from all US markets
-    } catch (e) {
-      console.error('[US Markets] Gainers fetch error:', e.message);
-    }
-    
-    // Fetch losers
-    try {
-      const losersData = await fetchJSON(losersUrl);
-      const quotes = losersData?.finance?.result?.[0]?.quotes || [];
-      losers = quotes
-        .filter(q => usExchanges.includes(q.exchange))
-        .map(q => ({
-          symbol: q.symbol,
-          name: q.shortName || q.longName || q.symbol,
-          price: q.regularMarketPrice,
-          change: q.regularMarketChange,
-          changePercent: q.regularMarketChangePercent,
-          volume: q.regularMarketVolume,
-          marketCap: q.marketCap,
-          exchange: getExchangeName(q.exchange)
-        }))
-        .slice(0, 10); // Top 10 losers from all US markets
-    } catch (e) {
-      console.error('[US Markets] Losers fetch error:', e.message);
-    }
-    
-    const result = {
-      gainers,
-      losers,
-      lastUpdate: new Date().toISOString(),
-      totalGainers: gainers.length,
-      totalLosers: losers.length
-    };
-    
-    nasdaqMoversCache.data = result;
-    nasdaqMoversCache.time = Date.now();
-    
-    console.log(`[US Markets] ✅ Fetched ${gainers.length} gainers, ${losers.length} losers`);
-    
-    return result;
-  } catch (error) {
-    console.error('[US Markets] Error fetching movers:', error.message);
-    return { gainers: [], losers: [], error: error.message };
-  }
-}
-
-/**
- * Convert exchange code to readable name
- */
-function getExchangeName(code) {
-  const exchanges = {
-    'NMS': 'NASDAQ',
-    'NGM': 'NASDAQ',
-    'NCM': 'NASDAQ',
-    'NIM': 'NASDAQ',
-    'NYQ': 'NYSE',
-    'NYS': 'NYSE',
-    'ASE': 'AMEX',
-    'PCX': 'NYSE ARCA'
-  };
-  return exchanges[code] || code;
-}
-
-/**
- * Check for extreme movers (>20%) and send alerts
- * Includes cooldown to prevent spam
- */
-function checkExtremeMovers(movers) {
-  if (!EMAIL_CONFIG.enabled) return;
-  
-  const now = Date.now();
-  const allStocks = [...(movers.gainers || []), ...(movers.losers || [])];
-  
-  // Find stocks with >20% move that haven't been alerted recently
-  const extremeMovers = allStocks.filter(s => {
-    if (!s.changePercent || Math.abs(s.changePercent) < EXTREME_MOVE_THRESHOLD) {
-      return false;
-    }
-    
-    // Check cooldown
-    const lastAlerted = stockAlertHistory.get(s.symbol);
-    if (lastAlerted && now - lastAlerted < STOCK_ALERT_COOLDOWN) {
-      return false; // Still in cooldown
-    }
-    
-    return true;
-  });
-  
-  if (extremeMovers.length === 0) return;
-  
-  // Mark these stocks as alerted
-  extremeMovers.forEach(s => stockAlertHistory.set(s.symbol, now));
-  
-  // Clean up old entries (older than 24 hours)
-  for (const [symbol, time] of stockAlertHistory.entries()) {
-    if (now - time > 24 * 60 * 60 * 1000) {
-      stockAlertHistory.delete(symbol);
-    }
-  }
-  
-  // Send alert email
-  const subject = `🚨 EXTREME STOCK ALERT: ${extremeMovers.length} stock(s) moved >20%!`;
-  
-  const moversHtml = extremeMovers
-    .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
-    .map(s => `
-      <div style="padding: 12px; background: ${s.changePercent >= 0 ? '#1a3d1a' : '#3d1a1a'}; border-radius: 8px; margin: 8px 0; border-left: 4px solid ${s.changePercent >= 0 ? '#4ade80' : '#f87171'};">
-        <div style="font-size: 18px; font-weight: bold;">
-          ${s.symbol} 
-          <span style="color: ${s.changePercent >= 0 ? '#4ade80' : '#f87171'}; font-size: 24px;">
-            ${s.changePercent >= 0 ? '🚀' : '📉'} ${s.changePercent >= 0 ? '+' : ''}${s.changePercent?.toFixed(2)}%
-          </span>
-        </div>
-        <div style="color: #aaa; font-size: 14px; margin-top: 4px;">${s.name}</div>
-        <div style="margin-top: 8px;">
-          Price: <strong>$${s.price?.toFixed(2)}</strong> | 
-          Volume: <strong>${formatVolumeForEmail(s.volume)}</strong>
-        </div>
-      </div>
-    `).join('');
-  
-  const body = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #fff; padding: 24px; max-width: 600px;">
-      <h1 style="color: #ff6b6b; margin-bottom: 8px;">🚨 Extreme Stock Movement Alert</h1>
-      <p style="color: #aaa; margin-bottom: 24px;">
-        The following NASDAQ stocks have moved more than <strong style="color: #fff;">20%</strong> today:
-      </p>
-      ${moversHtml}
-      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #333;">
-        <p style="color: #666; font-size: 12px;">
-          ⏰ Alert Time: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET<br>
-          📊 Next check in 10 minutes (during market hours)<br>
-          🔕 Cooldown: 2 hours per stock to prevent spam<br><br>
-          Sent by Nocturne 24x7 Monitoring Service
-        </p>
-      </div>
-    </div>
-  `;
-  
-  console.log(`[NASDAQ] 🚨 Sending extreme mover alert for: ${extremeMovers.map(s => s.symbol).join(', ')}`);
-  sendEmail(subject, body);
-}
-
-function formatVolumeForEmail(vol) {
-  if (!vol) return '--';
-  if (vol >= 1e9) return (vol / 1e9).toFixed(2) + 'B';
-  if (vol >= 1e6) return (vol / 1e6).toFixed(2) + 'M';
-  if (vol >= 1e3) return (vol / 1e3).toFixed(1) + 'K';
-  return vol.toString();
-}
-
-/**
- * Check if we should run the NASDAQ movers check
- * Only runs during market hours + 30 min after close
- */
-function shouldCheckNasdaqMovers() {
-  const now = new Date();
-  const nyTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = nyTime.getDay();
-  const hour = nyTime.getHours();
-  const minute = nyTime.getMinutes();
-  const time = hour * 60 + minute;
-  
-  // Market hours: 9:30 AM - 4:00 PM ET, plus 30 min after close
-  const marketOpen = 9 * 60 + 30;
-  const extendedClose = 16 * 60 + 30; // 4:30 PM
-  
-  const isWeekday = day >= 1 && day <= 5;
-  const isDuringHours = time >= marketOpen && time <= extendedClose;
-  
-  return isWeekday && isDuringHours;
-}
-
-/**
- * Scheduled NASDAQ movers check - runs every 10 minutes during market hours
- */
-async function scheduledNasdaqMoversCheck() {
-  if (!shouldCheckNasdaqMovers()) {
-    console.log('[NASDAQ] Skipping check - outside market hours');
-    return;
-  }
-  
-  if (!STOCKS_CONFIG.enabled) {
-    console.log('[NASDAQ] Skipping check - stocks module disabled');
-    return;
-  }
-  
-  try {
-    console.log('[NASDAQ] Running scheduled movers check...');
-    const movers = await fetchNasdaqMovers();
-    checkExtremeMovers(movers);
-  } catch (error) {
-    console.error('[NASDAQ] Scheduled check error:', error.message);
-  }
-}
-
-// Start the 10-minute NASDAQ movers check interval
-const NASDAQ_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
-setInterval(scheduledNasdaqMoversCheck, NASDAQ_CHECK_INTERVAL);
-
-// Run initial check after 30 seconds (let server start up)
-setTimeout(() => {
-  console.log('[NASDAQ] Starting initial movers check...');
-  scheduledNasdaqMoversCheck();
-}, 30 * 1000);
 
 // ============================================================================
 // NEWS MODULE - News Headlines via RSS Feeds (Free, No API Key)
@@ -2005,6 +1388,139 @@ async function getBreakingNews() {
   return { articles: breaking.slice(0, 5) };
 }
 
+/**
+ * Fetch and extract readable content from an article URL
+ */
+const articleCache = {};
+const ARTICLE_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+async function fetchArticleContent(articleUrl) {
+  // Check cache
+  if (articleCache[articleUrl] && (Date.now() - articleCache[articleUrl].time) < ARTICLE_CACHE_DURATION) {
+    return articleCache[articleUrl].data;
+  }
+
+  console.log('[News] Fetching article:', articleUrl);
+
+  const html = await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timeout')), 15000);
+    const protocol = articleUrl.startsWith('https') ? https : http;
+
+    const doRequest = (requestUrl, redirectCount = 0) => {
+      if (redirectCount > 5) {
+        clearTimeout(timeout);
+        reject(new Error('Too many redirects'));
+        return;
+      }
+      protocol.get(requestUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Nocturne/3.1)',
+          'Accept': 'text/html'
+        }
+      }, (response) => {
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          doRequest(response.headers.location, redirectCount + 1);
+          return;
+        }
+        let data = '';
+        response.on('data', chunk => data += chunk);
+        response.on('end', () => { clearTimeout(timeout); resolve(data); });
+        response.on('error', (err) => { clearTimeout(timeout); reject(err); });
+      }).on('error', (err) => { clearTimeout(timeout); reject(err); });
+    };
+
+    doRequest(articleUrl);
+  });
+
+  // Extract readable content from HTML
+  const result = extractReadableContent(html, articleUrl);
+
+  articleCache[articleUrl] = { data: result, time: Date.now() };
+  return result;
+}
+
+function extractReadableContent(html, sourceUrl) {
+  // Extract title
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  let title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+  // Clean common title suffixes
+  title = title.replace(/\s*[-|–—]\s*(BBC|NPR|CNBC|Bloomberg|TechCrunch|Ars Technica|Reuters|Hacker News).*$/i, '').trim();
+
+  // Try to get og:image
+  const ogImageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  const image = ogImageMatch ? ogImageMatch[1] : null;
+
+  // Try to get author
+  const authorMatch = html.match(/<meta[^>]+name=["']author["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']author["']/i);
+  const author = authorMatch ? authorMatch[1] : null;
+
+  // Try to get publish date
+  const dateMatch = html.match(/<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<time[^>]+datetime=["']([^"']+)["']/i);
+  const publishedAt = dateMatch ? dateMatch[1] : null;
+
+  // Extract article content - try <article> tag first, then common content containers
+  let contentHtml = '';
+  const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+  if (articleMatch) {
+    contentHtml = articleMatch[1];
+  } else {
+    // Try common content selectors
+    const contentPatterns = [
+      /<div[^>]+class=["'][^"']*(?:article-body|story-body|entry-content|post-content|article-content|main-content)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+      /<main[^>]*>([\s\S]*?)<\/main>/i
+    ];
+    for (const pattern of contentPatterns) {
+      const m = html.match(pattern);
+      if (m) { contentHtml = m[1]; break; }
+    }
+  }
+
+  if (!contentHtml) {
+    // Fallback: grab all <p> tags from body
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    contentHtml = bodyMatch ? bodyMatch[1] : html;
+  }
+
+  // Extract paragraphs from the content
+  const paragraphs = [];
+  const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  let pMatch;
+  while ((pMatch = pRegex.exec(contentHtml)) !== null) {
+    // Strip HTML tags but keep text
+    const text = pMatch[1]
+      .replace(/<a[^>]*>([\s\S]*?)<\/a>/gi, '$1') // Keep link text
+      .replace(/<[^>]+>/g, '') // Strip remaining tags
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Filter out junk paragraphs (navigation, ads, etc.)
+    if (text.length > 40 &&
+        !text.match(/^(Share|Follow|Subscribe|Sign up|Cookie|Accept|Advertisement|Read more|Related|Copyright)/i) &&
+        !text.match(/^\s*(©|All rights reserved)/i)) {
+      paragraphs.push(text);
+    }
+  }
+
+  return {
+    title,
+    author,
+    publishedAt,
+    image,
+    paragraphs,
+    sourceUrl,
+    wordCount: paragraphs.join(' ').split(/\s+/).length
+  };
+}
+
 // ============================================================================
 // WEATHER MODULE - Using Open-Meteo (Free, No API Key Required)
 // ============================================================================
@@ -2075,81 +1591,6 @@ async function getWeatherForecast(lat, lon) {
 }
 
 // ============================================================================
-// CRYPTO MODULE - Using CoinGecko (Free, No API Key Required)
-// ============================================================================
-const cryptoCache = { data: null, time: 0 };
-const CRYPTO_CACHE_DURATION = 60 * 1000; // 1 minute (rate limit friendly)
-
-async function getCryptoPrices() {
-  // Check cache
-  if (cryptoCache.data && (Date.now() - cryptoCache.time) < CRYPTO_CACHE_DURATION) {
-    console.log('[Crypto] Using cached data');
-    return cryptoCache.data;
-  }
-  
-  console.log('[Crypto] Fetching from CoinGecko...');
-  
-  try {
-    // CoinGecko API - free, no key needed
-    const url = 'https://api.coingecko.com/api/v3/coins/markets' +
-      '?vs_currency=usd' +
-      '&ids=bitcoin,ethereum,solana,cardano,dogecoin,ripple,binancecoin,polkadot,avalanche-2,polygon' +
-      '&order=market_cap_desc' +
-      '&per_page=10&page=1' +
-      '&sparkline=true' +
-      '&price_change_percentage=24h';
-    
-    const coins = await fetchJSON(url);
-    
-    // Also get global data
-    const globalUrl = 'https://api.coingecko.com/api/v3/global';
-    const globalData = await fetchJSON(globalUrl);
-    
-    const result = {
-      coins: coins.map(coin => ({
-        id: coin.id,
-        symbol: coin.symbol,
-        name: coin.name,
-        price: coin.current_price,
-        priceChange24h: coin.price_change_percentage_24h || 0,
-        marketCap: coin.market_cap,
-        volume24h: coin.total_volume,
-        high24h: coin.high_24h,
-        low24h: coin.low_24h,
-        ath: coin.ath,
-        athDate: coin.ath_date,
-        sparkline: coin.sparkline_in_7d?.price?.slice(-24) || [] // Last 24 data points
-      })),
-      global: {
-        totalMarketCap: globalData.data?.total_market_cap?.usd || 0,
-        totalVolume: globalData.data?.total_volume?.usd || 0,
-        btcDominance: globalData.data?.market_cap_percentage?.btc || 0,
-        ethDominance: globalData.data?.market_cap_percentage?.eth || 0,
-        activeCryptos: globalData.data?.active_cryptocurrencies || 0,
-        markets: globalData.data?.markets || 0
-      },
-      lastUpdate: new Date().toISOString()
-    };
-    
-    cryptoCache.data = result;
-    cryptoCache.time = Date.now();
-    
-    console.log(`[Crypto] ✅ Fetched ${result.coins.length} coins`);
-    return result;
-  } catch (error) {
-    console.error('[Crypto] Fetch error:', error.message);
-    
-    // Return cached data if available, even if stale
-    if (cryptoCache.data) {
-      console.log('[Crypto] Returning stale cache due to error');
-      return cryptoCache.data;
-    }
-    
-    throw error;
-  }
-}
-
-// ============================================================================
 // Start Server - Nocturne 24x7 Personal Assistant
 // ============================================================================
 server.listen(PORT, () => {
@@ -2158,20 +1599,14 @@ server.listen(PORT, () => {
   
   console.log('Enabled Modules:');
   if (MODULES_ENABLED.aurora) console.log('  🌌 Aurora Tracker');
-  if (MODULES_ENABLED.stocks) console.log('  📈 Stock Market (Yahoo Finance)');
   if (MODULES_ENABLED.news) console.log('  📰 Breaking News (RSS Feeds)');
   console.log('  🌤️  Weather (Open-Meteo)');
-  console.log('  💰 Crypto (CoinGecko)');
   console.log('');
   
   console.log('Data sources:');
   console.log('  • NOAA DSCOVR/ACE real-time solar wind');
   console.log('  • NOAA OVATION aurora forecast model');
   console.log('  • Open-Meteo weather & cloud coverage');
-  console.log('  • CoinGecko cryptocurrency (free, no API key)');
-  if (MODULES_ENABLED.stocks) {
-    console.log('  • Yahoo Finance (free, no API key)');
-  }
   if (MODULES_ENABLED.news) {
     console.log('  • RSS feeds (BBC, NPR, TechCrunch, etc.)');
   }

@@ -385,13 +385,8 @@ document.addEventListener('keydown', (e) => {
   }
 
   const shortcuts = {
-    '1': 'dashboard',
-    '2': 'aurora',
-    '3': 'weather',
-    '4': 'crypto',
-    '5': 'stocks',
-    '6': 'news',
-    's': 'settings'
+    '1': 'aurora',
+    '2': 'news'
   };
 
   const key = e.key.toLowerCase();

@@ -8,35 +8,11 @@
 // Module Registry
 // =============================================================================
 const MODULES = {
-  dashboard: {
-    id: 'dashboard',
-    name: 'Dashboard',
-    icon: '📊',
-    script: '/src/modules/dashboard/dashboard.js',
-    loaded: false,
-    instance: null
-  },
   aurora: {
     id: 'aurora',
     name: 'Aurora Tracker',
     icon: '🌌',
     script: '/src/modules/aurora/aurora.js',
-    loaded: false,
-    instance: null
-  },
-  crypto: {
-    id: 'crypto',
-    name: 'Crypto',
-    icon: '💰',
-    script: '/src/modules/crypto/crypto.js',
-    loaded: false,
-    instance: null
-  },
-  stocks: {
-    id: 'stocks',
-    name: 'Stock Market',
-    icon: '📈',
-    script: '/src/modules/stocks/stocks.js',
     loaded: false,
     instance: null
   },
@@ -47,18 +23,10 @@ const MODULES = {
     script: '/src/modules/news/news.js',
     loaded: false,
     instance: null
-  },
-  settings: {
-    id: 'settings',
-    name: 'Settings',
-    icon: '⚙️',
-    script: '/src/modules/settings/settings.js',
-    loaded: false,
-    instance: null
   }
 };
 
-let activeModule = 'dashboard';
+let activeModule = 'aurora';
 
 // =============================================================================
 // Tab Navigation
@@ -206,8 +174,8 @@ async function init() {
   updateHeaderTime();
   setInterval(updateHeaderTime, 1000);
   
-  // Load default module (dashboard)
-  await loadModule('dashboard');
+  // Load default module (aurora)
+  await loadModule('aurora');
   
   // Update global status periodically
   setInterval(() => {

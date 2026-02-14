@@ -6,13 +6,11 @@
  * ├── Static File Serving     (10 tests) - HTML, CSS, JS, PWA assets
  * ├── Aurora/Solar APIs       (12 tests) - /api/solar-wind, /api/aurora/status
  * ├── Aurora Support APIs     (11 tests) - /api/clouds, /api/ovation, /api/weather/forecast
- * ├── Stocks APIs             (15 tests) - /api/stocks/*, market status, movers, charts
- * ├── Crypto APIs             (2 tests)  - /api/crypto/prices
  * ├── News APIs               (2 tests)  - /api/news/headlines  
  * ├── Status APIs             (3 tests)  - /api/status
  * └── Security & Validation   (7 tests)  - Error handling, data validation
  * 
- * Total: 59 tests
+ * Total: 42 tests
  * 
  * Run: npm test
  */
@@ -346,119 +344,8 @@ describe('Nocturne Server v3.1.0', () => {
   // =========================================================================
   // STOCKS APIs (15 tests)
   // =========================================================================
-
-  describe('API: /api/stocks/prices', () => {
-    
-    it('should return stock prices with stocks array', async () => {
-      const res = await httpGet('/api/stocks/prices', 15000);
-      assert.strictEqual(res.status, 200);
-      assert.ok('stocks' in res.data || 'error' in res.data);
-    });
-
-    it('should return market indices', async () => {
-      const res = await httpGet('/api/stocks/prices', 15000);
-      if (!res.data.error) {
-        assert.ok('indices' in res.data);
-      }
-    });
-
-    it('should return stock data with required fields', async () => {
-      const res = await httpGet('/api/stocks/prices', 15000);
-      if (res.data.stocks?.length > 0) {
-        assert.ok('symbol' in res.data.stocks[0]);
-      }
-    });
-  });
-
-  describe('API: /api/stocks/market-status', () => {
-    
-    it('should return market status', async () => {
-      const res = await httpGet('/api/stocks/market-status');
-      assert.strictEqual(res.status, 200);
-      assert.ok('isOpen' in res.data);
-      assert.strictEqual(typeof res.data.isOpen, 'boolean');
-    });
-
-    it('should return timezone information', async () => {
-      const res = await httpGet('/api/stocks/market-status');
-      assert.strictEqual(res.data.timezone, 'America/New_York');
-    });
-  });
-
-  describe('API: /api/stocks/nasdaq-movers (US Markets)', () => {
-    
-    it('should return US market movers with gainers and losers', async () => {
-      const res = await httpGet('/api/stocks/nasdaq-movers', 20000);
-      assert.strictEqual(res.status, 200);
-      assert.ok(Array.isArray(res.data.gainers) && Array.isArray(res.data.losers));
-    });
-
-    it('should return up to 10 movers from each category', async () => {
-      const res = await httpGet('/api/stocks/nasdaq-movers', 20000);
-      if (res.data.gainers) {
-        assert.ok(res.data.gainers.length <= 10);
-      }
-      if (res.data.losers) {
-        assert.ok(res.data.losers.length <= 10);
-      }
-    });
-
-    it('should return mover data with exchange info', async () => {
-      const res = await httpGet('/api/stocks/nasdaq-movers', 20000);
-      if (res.data.gainers?.length > 0) {
-        assert.ok('symbol' in res.data.gainers[0]);
-        assert.ok('exchange' in res.data.gainers[0]);
-      }
-    });
-  });
-
-  describe('API: /api/stocks/chart', () => {
-    
-    it('should return chart data for valid symbol', async () => {
-      const res = await httpGet('/api/stocks/chart?symbol=AAPL&range=1d', 15000);
-      assert.strictEqual(res.status, 200);
-    });
-
-    it('should return error for missing symbol', async () => {
-      const res = await httpGet('/api/stocks/chart');
-      assert.strictEqual(res.status, 400);
-      assert.ok('error' in res.data);
-    });
-
-    it('should return dataPoints array', async () => {
-      const res = await httpGet('/api/stocks/chart?symbol=AAPL&range=1d', 15000);
-      if (!res.data.error) {
-        assert.ok(Array.isArray(res.data.dataPoints));
-      }
-    });
-
-    it('should support different time ranges', async () => {
-      for (const range of ['1d', '5d', '1m']) {
-        const res = await httpGet(`/api/stocks/chart?symbol=AAPL&range=${range}`, 15000);
-        assert.strictEqual(res.status, 200);
-      }
-    });
-  });
-
+  // NEWS APIs (2 tests)
   // =========================================================================
-  // CRYPTO & NEWS APIs (4 tests)
-  // =========================================================================
-
-  describe('API: /api/crypto/prices', () => {
-    
-    it('should return crypto prices with coins array', async () => {
-      const res = await httpGet('/api/crypto/prices', 15000);
-      assert.strictEqual(res.status, 200);
-      assert.ok('coins' in res.data || 'error' in res.data);
-    });
-
-    it('should return coin data with required fields', async () => {
-      const res = await httpGet('/api/crypto/prices', 15000);
-      if (res.data.coins?.length > 0) {
-        assert.ok('symbol' in res.data.coins[0] && 'price' in res.data.coins[0]);
-      }
-    });
-  });
 
   describe('API: /api/news/headlines', () => {
     
@@ -497,7 +384,7 @@ describe('Nocturne Server v3.1.0', () => {
     it('should return module status', async () => {
       const res = await httpGet('/api/status');
       assert.ok('modules' in res.data);
-      assert.ok('aurora' in res.data.modules && 'stocks' in res.data.modules);
+      assert.ok('aurora' in res.data.modules && 'news' in res.data.modules);
     });
   });
 
