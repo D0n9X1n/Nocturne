@@ -8,6 +8,14 @@ import { config } from 'dotenv';
 // Load .env file
 config();
 
+// Global error safety net - prevent server crashes from unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Uncaught exception:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Fatal] Unhandled rejection:', reason?.message || reason);
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -43,7 +51,7 @@ const EMAIL_CONFIG = {
 const NEWS_CONFIG = {
   enabled: MODULES_ENABLED.news,
   apiKey: process.env.NEWSAPI_KEY || '',
-  categories: (process.env.NEWS_CATEGORIES || 'general,technology,business').split(',').filter(c => c.trim()),
+  categories: (process.env.NEWS_CATEGORIES || 'general,technology,business,china,immigration,kingcounty').split(',').filter(c => c.trim()),
   keywords: (process.env.NEWS_KEYWORDS || '').split(',').filter(k => k.trim())
 };
 
@@ -181,10 +189,6 @@ function processSpaceWeatherData(plasma, mag, scales) {
     // NOAA Scales: 0=current observed, 1=today predicted, 2=tomorrow, 3=day after
     const currentScale = scales['0'];
     const predictedScale = scales['1'];
-
-    // Debug log
-    console.log('[Data] Plasma entry:', latestPlasma);
-    console.log('[Data] Mag entry:', latestMag);
 
     // Plasma data format: [time, density, speed, temperature]
     // Note: NOAA format has density at [1], speed at [2], temp at [3]
@@ -350,7 +354,6 @@ async function fetchCloudData(lat, lon) {
     };
 
     cloudCache[cacheKey] = { data: result, time: Date.now() };
-    console.log(`[Cloud] ${cacheKey}: ${result.total}% (Low: ${result.low}%, Mid: ${result.mid}%, High: ${result.high}%) - ${trend}`);
     return result;
   } catch (e) {
     console.error('[Cloud] Error:', e.message);
@@ -1006,7 +1009,7 @@ const server = http.createServer(async (req, res) => {
   // AURORA MODULE APIs
   // ==========================================
   
-  // API: Aurora Status (for dashboard widget)
+  // API: Aurora Status
   if (url.pathname === '/api/aurora/status') {
     try {
       // Get cached solar wind data or fetch fresh
@@ -1024,12 +1027,10 @@ const server = http.createServer(async (req, res) => {
       
       // Calculate aurora score (0-100)
       const auroraScore = solarData.similarity || 0;
-      const kp = solarData.kpIndex || 0;
       
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         auroraScore,
-        kp,
         bz: solarData.bz,
         speed: solarData.speed,
         density: solarData.density,
@@ -1039,7 +1040,7 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       console.error('[Aurora] Status error:', error.message);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ auroraScore: 0, kp: 0, status: 'Unknown', error: error.message }));
+      res.end(JSON.stringify({ auroraScore: 0, status: 'Unknown', error: error.message }));
     }
     return;
   }
@@ -1178,7 +1179,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/status') {
     const status = {
       service: 'Nocturne',
-      version: '3.2.0',
+      version: '3.3.0',
       uptime: process.uptime(),
       modules: {
         aurora: MODULES_ENABLED.aurora,
@@ -1244,8 +1245,20 @@ const RSS_FEEDS = {
     { name: 'Hacker News', url: 'https://hnrss.org/frontpage' }
   ],
   business: [
-    { name: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' },
-    { name: 'Bloomberg', url: 'https://feeds.bloomberg.com/markets/news.rss' }
+    { name: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html' }
+  ],
+  china: [
+    { name: 'SCMP', url: 'https://www.scmp.com/rss/91/feed' },
+    { name: 'BBC China', url: 'http://feeds.bbci.co.uk/news/world/asia/china/rss.xml' },
+    { name: 'Reuters China', url: 'https://news.google.com/rss/search?q=China+news&hl=en-US&gl=US&ceid=US:en' }
+  ],
+  immigration: [
+    { name: 'Google News Immigration', url: 'https://news.google.com/rss/search?q=immigration+USA&hl=en-US&gl=US&ceid=US:en' },
+    { name: 'BBC Immigration', url: 'https://news.google.com/rss/search?q=immigration+ICE+deportation&hl=en-US&gl=US&ceid=US:en' }
+  ],
+  kingcounty: [
+    { name: 'Seattle Times', url: 'https://www.seattletimes.com/feed/' },
+    { name: 'Google King County', url: 'https://news.google.com/rss/search?q=%22King+County%22+OR+%22Seattle%22+news&hl=en-US&gl=US&ceid=US:en' }
   ],
   science: [
     { name: 'NASA', url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss' },
@@ -1295,7 +1308,8 @@ function parseRSSItems(xml, sourceName, category) {
 /**
  * Fetch RSS feed content
  */
-async function fetchRSSFeed(url) {
+async function fetchRSSFeed(url, redirectCount = 0) {
+  if (redirectCount > 5) throw new Error('Too many redirects');
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
     const protocol = url.startsWith('https') ? https : http;
@@ -1309,7 +1323,10 @@ async function fetchRSSFeed(url) {
       // Handle redirects
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         clearTimeout(timeout);
-        fetchRSSFeed(res.headers.location).then(resolve).catch(reject);
+        // Consume the redirect response to free the socket
+        res.resume();
+        res.on('error', () => {});
+        fetchRSSFeed(res.headers.location, redirectCount + 1).then(resolve).catch(reject);
         return;
       }
       
@@ -1319,8 +1336,14 @@ async function fetchRSSFeed(url) {
         clearTimeout(timeout);
         resolve(data);
       });
-      res.on('error', reject);
-    }).on('error', reject);
+      res.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    }).on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
   });
 }
 
@@ -1400,7 +1423,7 @@ async function fetchArticleContent(articleUrl) {
     return articleCache[articleUrl].data;
   }
 
-  console.log('[News] Fetching article:', articleUrl);
+
 
   const html = await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Timeout')), 15000);
@@ -1412,13 +1435,16 @@ async function fetchArticleContent(articleUrl) {
         reject(new Error('Too many redirects'));
         return;
       }
-      protocol.get(requestUrl, {
+      const reqProtocol = requestUrl.startsWith('https') ? https : http;
+      reqProtocol.get(requestUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; Nocturne/3.1)',
           'Accept': 'text/html'
         }
       }, (response) => {
         if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          response.resume();
+          response.on('error', () => {});
           doRequest(response.headers.location, redirectCount + 1);
           return;
         }
@@ -1532,7 +1558,6 @@ async function getWeatherForecast(lat, lon) {
   const cached = weatherCache[cacheKey];
   
   if (cached && (Date.now() - cached.time) < WEATHER_CACHE_DURATION) {
-    console.log('[Weather] Using cached data for', cacheKey);
     return cached.data;
   }
   
@@ -1594,7 +1619,7 @@ async function getWeatherForecast(lat, lon) {
 // Start Server - Nocturne 24x7 Personal Assistant
 // ============================================================================
 server.listen(PORT, () => {
-  console.log('\n🌙 Nocturne v3.2.0 - Your 24x7 Personal Assistant');
+  console.log('\n🌙 Nocturne v3.3.0 - Your 24x7 Personal Assistant');
   console.log(`📡 http://localhost:${PORT}\n`);
   
   console.log('Enabled Modules:');

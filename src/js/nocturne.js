@@ -42,7 +42,7 @@ function initTabs() {
   });
 }
 
-// Global function for dashboard quick links
+// Global function for module tab switching
 window.switchModule = async function(moduleId) {
   if (moduleId === activeModule) return;
   

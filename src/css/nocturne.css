@@ -478,8 +478,20 @@
   100% { transform: translateX(-100%); }
 }
 
+.news-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .news-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .news-section {
-  margin-bottom: 32px;
+  margin-bottom: 0;
 }
 
 .section-title {
@@ -641,15 +653,15 @@
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ccc;
-  font-size: 18px;
-  width: 36px;
-  height: 36px;
+  font-size: 14px;
+  padding: 6px 14px;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.2s;
+  white-space: nowrap;
 }
 
 .reader-close:hover {
@@ -784,8 +796,20 @@
   .reader-panel {
     max-width: 100%;
   }
+  .reader-toolbar {
+    padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    gap: 8px;
+  }
+  .reader-close {
+    font-size: 15px;
+    padding: 10px 16px;
+    min-height: 44px;
+    background: rgba(255, 255, 255, 0.08);
+  }
   .reader-body {
-    padding: 24px 18px 40px;
+    padding: 20px 16px 40px;
+    padding-bottom: max(40px, env(safe-area-inset-bottom));
   }
   .reader-title {
     font-size: 1.4em;
@@ -794,7 +818,18 @@
     font-size: 1em;
   }
   .reader-hero {
-    margin: 0 -18px 20px;
+    margin: 0 -16px 20px;
+  }
+  .news-section {
+    margin-bottom: 0;
+  }
+  .news-card {
+    padding: 14px;
+  }
+  .breaking-banner {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 }
 

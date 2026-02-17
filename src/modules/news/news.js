@@ -21,7 +21,7 @@ export const MODULE_INFO = {
 // Configuration
 // =============================================================================
 const config = {
-  categories: ['general', 'technology', 'business'],
+  categories: ['general', 'technology', 'business', 'china', 'immigration', 'kingcounty'],
   keywords: [],
   refreshInterval: 5 * 60 * 1000 // 5 minutes
 };
@@ -137,7 +137,9 @@ function updateUI() {
   
   container.innerHTML = `
     ${breakingHtml}
-    ${categoriesHtml}
+    <div class="news-columns">
+      ${categoriesHtml}
+    </div>
     <div class="news-footer">
       <span>Last updated: ${new Date().toLocaleTimeString()}</span>
       <button class="refresh-btn" onclick="window.nocturneModules?.news?.refresh?.()">↻ Refresh</button>
@@ -150,6 +152,9 @@ function getCategoryIcon(category) {
     general: '📰',
     technology: '💻',
     business: '💼',
+    china: '🇨🇳',
+    immigration: '🛂',
+    kingcounty: '🏔️',
     science: '🔬',
     health: '🏥',
     sports: '⚽',
@@ -196,7 +201,7 @@ async function openReader(encodedUrl, source) {
   overlay.innerHTML = `
     <div class="reader-panel">
       <div class="reader-toolbar">
-        <button class="reader-close" onclick="window.nocturneModules?.news?.closeReader?.()">✕</button>
+        <button class="reader-close" onclick="window.nocturneModules?.news?.closeReader?.()">← Back</button>
         <span class="reader-source">${source}</span>
         <a class="reader-open-link" href="${articleUrl}" target="_blank" rel="noopener">Open original ↗</a>
       </div>

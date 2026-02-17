@@ -55,7 +55,6 @@ coverage/
 jest.config.js
 
 # Build output
-public/
 dist/
 build/
 

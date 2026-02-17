@@ -24,9 +24,19 @@ run_cmd() {
 # Load .env file if exists
 if [ -f ".env" ]; then
     echo "📂 Found .env file, loading configuration..."
-    set -a
-    source .env
-    set +a
+    # Use a safe parser instead of source to handle unquoted values with spaces
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        # Trim leading/trailing whitespace from key
+        key=$(echo "$key" | xargs)
+        # Remove surrounding quotes from value if present
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+        export "$key"="$value"
+    done < .env
 else
     echo "⚠️  No .env file found. Using defaults or Azure settings."
     echo "   Create .env from .env.example for email notifications"
@@ -193,9 +203,31 @@ fi
 echo "✅ Web App ready"
 echo ""
 
-echo "4️⃣  Verifying app state..."
-APP_STATE=$(az webapp show --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --query state -o tsv 2>/dev/null)
-echo "   Current state: ${APP_STATE:-unknown}"
+echo "4️⃣  Deploying code with az webapp up..."
+echo "   This handles npm install and deployment automatically"
+
+DEPLOY_OK=0
+for ATTEMPT in 1 2 3; do
+    echo "   Deploy attempt ${ATTEMPT}/3..."
+    az webapp up \
+        --name "$APP_NAME" \
+        --resource-group "$RESOURCE_GROUP" \
+        --plan "$PLAN_NAME" \
+        --runtime "NODE:22-lts" \
+        --sku "${SKU:-B1}"
+    if [ $? -eq 0 ]; then
+        DEPLOY_OK=1
+        break
+    fi
+    echo "   ⚠️  Deploy attempt ${ATTEMPT} failed, retrying in 10s..."
+    sleep 10
+done
+if [ $DEPLOY_OK -ne 1 ]; then
+    echo "❌ Failed to deploy code after 3 attempts"
+    exit 1
+fi
+
+echo "✅ Code deployed"
 echo ""
 
 echo "5️⃣  Configuring Node.js settings..."
@@ -260,39 +292,9 @@ fi
 echo "✅ App settings configured (Always On enabled)"
 echo ""
 
-echo "6️⃣  Ensuring app is running..."
-az webapp start --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" > /dev/null 2>&1 || true
-echo "✅ App start requested"
-echo ""
-
-echo "7️⃣  Deploying code with az webapp up..."
-echo "   This handles npm install and deployment automatically"
-
-DEPLOY_RESULT=""
-DEPLOY_OK=0
-for ATTEMPT in 1 2 3; do
-    echo "   Deploy attempt ${ATTEMPT}/3..."
-    DEPLOY_RESULT=$(az webapp up \
-        --name "$APP_NAME" \
-        --resource-group "$RESOURCE_GROUP" \
-        --plan "$PLAN_NAME" \
-        --runtime "NODE:22-lts" \
-        --sku "$SKU" 2>&1)
-    if [ $? -eq 0 ]; then
-        DEPLOY_OK=1
-        break
-    fi
-    echo "   ⚠️  Deploy attempt ${ATTEMPT} failed, retrying in 10s..."
-    sleep 10
-done
-if [ $DEPLOY_OK -ne 1 ]; then
-    echo "❌ Failed to deploy code"
-    echo "Error details:"
-    echo "$DEPLOY_RESULT"
-    exit 1
-fi
-
-echo "✅ Code deployed"
+echo "6️⃣  Restarting app..."
+az webapp restart --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" > /dev/null 2>&1 || true
+echo "✅ App restarted with new settings"
 echo ""
 
 echo "⏳ Waiting for app to start (this may take 30-60 seconds)..."

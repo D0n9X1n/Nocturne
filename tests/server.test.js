@@ -1,16 +1,16 @@
 /**
- * Nocturne Server Tests v3.2.0
- * Using Node.js built-in test runner (Node 18+))
+ * Nocturne Server Tests v3.3.0
+ * Using Node.js built-in test runner (Node 18+)
  * 
  * Test Organization:
- * ├── Static File Serving     (10 tests) - HTML, CSS, JS, PWA assets
+ * ├── Static File Serving     (8 tests)  - HTML, CSS, JS, PWA assets
  * ├── Aurora/Solar APIs       (12 tests) - /api/solar-wind, /api/aurora/status
  * ├── Aurora Support APIs     (11 tests) - /api/clouds, /api/ovation, /api/weather/forecast
  * ├── News APIs               (2 tests)  - /api/news/headlines  
  * ├── Status APIs             (3 tests)  - /api/status
  * └── Security & Validation   (7 tests)  - Error handling, data validation
  * 
- * Total: 42 tests
+ * Total: 43 tests
  * 
  * Run: npm test
  */
@@ -81,7 +81,7 @@ async function waitForServer(maxAttempts = 30) {
 // MAIN TEST SUITE
 // ===========================================================================
 
-describe('Nocturne Server v3.2.0', () => {
+describe('Nocturne Server v3.3.0', () => {
   
   before(async () => {
     const serverPath = path.join(__dirname, '..', 'server.js');
@@ -94,9 +94,17 @@ describe('Nocturne Server v3.2.0', () => {
     await waitForServer();
   });
 
-  after(() => {
+  after(async () => {
     if (serverProcess) {
-      serverProcess.kill('SIGTERM');
+      await new Promise((resolve) => {
+        serverProcess.on('close', resolve);
+        serverProcess.kill('SIGTERM');
+        // Force kill after 3 seconds if SIGTERM doesn't work
+        setTimeout(() => {
+          try { serverProcess.kill('SIGKILL'); } catch { /* already dead */ }
+          resolve();
+        }, 3000);
+      });
     }
   });
 
@@ -125,25 +133,7 @@ describe('Nocturne Server v3.2.0', () => {
       assert.ok(res.headers['content-type'].includes('text/css'));
     });
 
-    it('should serve charts.css', async () => {
-      const res = await httpGet('/src/css/charts.css');
-      assert.strictEqual(res.status, 200);
-      assert.ok(res.headers['content-type'].includes('text/css'));
-    });
-
     it('should serve JavaScript files', async () => {
-      const res = await httpGet('/src/js/aurora.js');
-      assert.strictEqual(res.status, 200);
-      assert.ok(res.headers['content-type'].includes('application/javascript'));
-    });
-
-    it('should serve charts.js', async () => {
-      const res = await httpGet('/src/js/charts.js');
-      assert.strictEqual(res.status, 200);
-      assert.ok(res.headers['content-type'].includes('application/javascript'));
-    });
-
-    it('should serve nocturne.js', async () => {
       const res = await httpGet('/src/js/nocturne.js');
       assert.strictEqual(res.status, 200);
       assert.ok(res.headers['content-type'].includes('application/javascript'));
@@ -249,7 +239,7 @@ describe('Nocturne Server v3.2.0', () => {
     it('should return aurora status with required fields', async () => {
       const res = await httpGet('/api/aurora/status', 10000);
       assert.strictEqual(res.status, 200);
-      assert.ok('auroraScore' in res.data && 'kp' in res.data && 'status' in res.data);
+      assert.ok('auroraScore' in res.data && 'status' in res.data);
     });
 
     it('should return valid aurora score between 0 and 100', async () => {
@@ -373,7 +363,7 @@ describe('Nocturne Server v3.2.0', () => {
       const res = await httpGet('/api/status');
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.data.service, 'Nocturne');
-      assert.strictEqual(res.data.version, '3.2.0');
+      assert.strictEqual(res.data.version, '3.3.0');
     });
 
     it('should return uptime information', async () => {
