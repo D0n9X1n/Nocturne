@@ -1639,7 +1639,8 @@ server.listen(PORT, () => {
   
   if (EMAIL_CONFIG.enabled) {
     console.log(`📧 Email alerts: ENABLED (${EMAIL_CONFIG.recipients.length} recipients)`);
-    scheduleDailySummary();
+    // Daily aurora summary email disabled by user request — threshold-based alerts only.
+    // scheduleDailySummary();
   } else {
     console.log('📧 Email alerts: DISABLED');
   }
